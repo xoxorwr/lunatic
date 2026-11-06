@@ -1684,8 +1684,16 @@ static void realized(GtkWidget *widget, gpointer data)
     position();
 }
 
+static int canvas_extent(const DockView *view, int allocated_height)
+{
+    /* GTK allocations can lag behind work-area changes. Anchor the shelf to
+     * the usable screen, even while the old, taller canvas is still allocated. */
+    return MAX(1, view->height > 0 ? MIN(allocated_height, view->height) : allocated_height);
+}
+
 static void layout_items(int height)
 {
+    height = canvas_extent(dock.view, height);
     guint count = dock.items->len;
     g_array_set_size(dock.layout_scratch, count);
     LayoutIcon *icons = (LayoutIcon *)dock.layout_scratch->data;
@@ -1957,7 +1965,7 @@ static gboolean canvas_render(GtkWidget *area, cairo_t *cr, gpointer data)
         dock.view = data;
     (void)data;
     GtkWidget *widget = area;
-    int height = gtk_widget_get_allocated_height(widget);
+    int height = canvas_extent(dock.view, gtk_widget_get_allocated_height(widget));
     cairo_surface_t *frame = icon_renderer_surface(&dock.view->renderer);
     if (frame && !g_object_get_data(G_OBJECT(widget), "frame-dirty") &&
         cairo_image_surface_get_width(frame) ==
@@ -2031,7 +2039,7 @@ static gboolean canvas_press(GtkWidget *widget, GdkEventButton *event, gpointer 
         dock.view->pressed = NULL;
         return TRUE;
     }
-    return FALSE; /* GTK's drag threshold handling must also see the press. */
+    return FALSE;
 }
 
 static gboolean canvas_release(GtkWidget *widget, GdkEventButton *event, gpointer data)
@@ -2050,12 +2058,33 @@ static gboolean canvas_release(GtkWidget *widget, GdkEventButton *event, gpointe
     return FALSE;
 }
 
+static gboolean begin_item_drag(GtkWidget *widget, GdkEventMotion *event, DockView *view)
+{
+    /* The canvas includes empty space and system buttons. Do not register it
+     * as an automatic drag source: cancelling from drag-begin reenters GTK
+     * before its source/selection ownership has finished initializing. */
+    if (!(event->state & GDK_BUTTON1_MASK) || !view->dragged ||
+        view->dragged != view->pressed || view->dragged->kind ||
+        (view->hide.quirks & INTERNAL_DND_ACTIVE))
+        return FALSE;
+    if (!gtk_drag_check_threshold(widget, (int)view->press_x, (int)view->press_y,
+                                  (int)event->x, (int)event->y))
+        return FALSE;
+
+    GtkTargetList *targets = gtk_target_list_new(drop_targets, 1);
+    GdkDragContext *context = gtk_drag_begin_with_coordinates(
+        widget, targets, GDK_ACTION_MOVE, 1, (GdkEvent *)event, -1, -1);
+    gtk_target_list_unref(targets);
+    return context != NULL;
+}
+
 static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 {
     if (data)
         dock.view = data;
     (void)data;
-    (void)widget;
+    if (begin_item_drag(widget, event, dock.view))
+        return TRUE;
     dock.view->pointer_inside = TRUE;
     update_layout();
     dock.mouse_x = dock.view->geometry.x +
@@ -2103,7 +2132,8 @@ static gboolean canvas_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer
     if (application_end() < dock.items->len)
         sum += 5; /* Gap reserved between scrolling apps and the system shelf. */
     dock.view->drag_delta =
-        CLAMP(dock.view->drag_delta, MIN(0, gtk_widget_get_allocated_height(widget) - sum), 0);
+        CLAMP(dock.view->drag_delta,
+              MIN(0, canvas_extent(dock.view, gtk_widget_get_allocated_height(widget)) - sum), 0);
     queue_render(widget);
     return TRUE;
 }
@@ -2118,8 +2148,6 @@ static void drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer data
     hide_machine_quirk(&dock.view->hide, INTERNAL_DND_ACTIVE, TRUE, g_get_monotonic_time() / 1000);
     if (dock.view->dragged && dock.view->dragged->icon)
         gtk_drag_set_icon_pixbuf(context, dock.view->dragged->icon, 0, 0);
-    else
-        gtk_drag_cancel(context);
     queue_render(widget);
 }
 
@@ -2642,7 +2670,6 @@ static DockView *create_view(int monitor)
     g_signal_connect(dock.view->items_box, "motion-notify-event", G_CALLBACK(canvas_motion), view);
     g_signal_connect(dock.view->items_box, "leave-notify-event", G_CALLBACK(canvas_leave), view);
     g_signal_connect(dock.view->items_box, "scroll-event", G_CALLBACK(canvas_scroll), view);
-    gtk_drag_source_set(dock.view->items_box, GDK_BUTTON1_MASK, drop_targets, 1, GDK_ACTION_MOVE);
     g_signal_connect(dock.view->items_box, "drag-begin", G_CALLBACK(drag_begin), view);
     g_signal_connect(dock.view->items_box, "drag-end", G_CALLBACK(drag_end), view);
     g_signal_connect(dock.view->items_box, "drag-data-get", G_CALLBACK(drag_data_get), view);

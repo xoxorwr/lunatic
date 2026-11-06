@@ -33,6 +33,17 @@ static void desktop_order(void)
     g_assert_cmpfloat(desktop->layout.center, ==, 709);
     g_assert_cmpfloat(trash->layout.center, ==, 768);
 
+    /* A panel/work-area change can precede GTK's next size allocation. The
+     * system shelf must already fit the new visible area in that interval. */
+    view.height = 720;
+    layout_items(800);
+    g_assert_cmpfloat(desktop->layout.center, ==, 629);
+    g_assert_cmpfloat(trash->layout.center, ==, 688);
+    g_assert_cmpfloat(trash->layout.hit_end, <=, view.height);
+    g_assert_cmpint(canvas_extent(&view, 800), ==, 720);
+    g_assert_cmpint(canvas_extent(&view, 640), ==, 640);
+    view.height = 0;
+
     /* Opening/pinning an application must not put it beneath Show Desktop or
      * accidentally include it in the shelf's bottom alignment. */
     Item *second = model_item("second.desktop", 0);
@@ -90,6 +101,31 @@ static void desktop_order(void)
     g_ptr_array_unref(dock.views);
     g_array_unref(dock.layout_scratch);
     dock = (Launcher){0};
+}
+
+static void invalid_drag_sources(void)
+{
+    DockView view = {0};
+    GdkEventMotion motion = {.state = GDK_BUTTON1_MASK, .x = 40, .y = 200};
+    /* No widget/display is needed: these gestures must never enter GTK's
+     * drag initialization (or its selection ownership machinery). */
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
+    Item system = {.kind = 2};
+    view.pressed = &system;
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
+    view.dragged = &system;
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
+
+    Item app = {0};
+    view.dragged = &app;
+    view.pressed = NULL; /* Source removed or gesture already consumed. */
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
+    view.pressed = &app;
+    motion.state = 0;
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
+    motion.state = GDK_BUTTON1_MASK;
+    view.hide.quirks = INTERNAL_DND_ACTIVE;
+    g_assert_false(begin_item_drag(NULL, &motion, &view));
 }
 
 static void launcher_update(const char *sender, const char *uri, const char *dictionary)
@@ -744,6 +780,7 @@ int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
     g_test_add_func("/host/desktop-order-and-layout", desktop_order);
+    g_test_add_func("/host/invalid-drag-sources", invalid_drag_sources);
     g_test_add_func("/host/launcherentry-urgency", launcherentry_urgency);
     g_test_add_func("/host/badge-app-lifetime", badge_app_lifetime);
     g_test_add_func("/host/hover-targets-and-tooltip-position", hover_targets_and_tooltip_position);
