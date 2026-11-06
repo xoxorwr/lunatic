@@ -1,9 +1,11 @@
-# Unity desktop components for Xfce
+# Lunatic
 
-- [launcher/](launcher/README.md): the C port of Unity's launcher, including its
-  upstream snapshot, artwork, tests and documentation.
-- [panel/](panel/README.md): initial global-menu implementation. Shared C code is
-  in `panel/common/`; the Xfce panel adapter is in `panel/xfce-plugin/`.
+Unity's launcher and global menu, reimplemented in C with minimal dependencies and support for multiple desktop environments.
+
+- [launcher/](launcher/README.md): Unity launcher port, including upstream snapshot, artwork, tests and documentation.
+- [panel/](panel/README.md): global-menu implementation, with shared C code in `panel/common/` and a dedicated plugin for each desktop environment. Currently includes an Xfce adapter in `panel/xfce-plugin/`.
+
+## Build
 
 ```sh
 make                         # launcher only; no panel dependencies
@@ -12,7 +14,4 @@ make panel                   # optional Xfce global-menu plugin
 make check                   # both components' checks
 ```
 
-Components can also be built independently with `make -C launcher` and
-`make -C panel`. Launcher configuration and installed executable names are
-unchanged. Panel installation is explicit: `make -C panel install`.
-# lunatic
+Launcher configuration and executable names remain unchanged. Panel installation is explicit: `make -C panel install`.
