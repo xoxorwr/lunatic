@@ -1148,12 +1148,15 @@ static GtkWidget *build_quicklist(Item *item, DockView *view)
                 window_menu_entry(menu, item, g_ptr_array_index(item->clients, i), item->name);
         }
     }
-    quicklist_section(menu, "LAUNCHER");
-    if (item && item->app)
+    if (item && item->app) {
+        quicklist_section(menu, NULL);
         menu_entry(menu, item->pinned ? "Unpin from launcher" : "Pin to launcher",
                    G_CALLBACK(menu_pin), item);
-    menu_entry(menu, "Settings…", G_CALLBACK(show_settings), view);
-    menu_entry(menu, "Quit launcher", G_CALLBACK(quit_launcher), NULL);
+    } else if (!item) {
+        quicklist_section(menu, "LAUNCHER");
+        menu_entry(menu, "Settings…", G_CALLBACK(show_settings), view);
+        menu_entry(menu, "Quit launcher", G_CALLBACK(quit_launcher), NULL);
+    }
     return menu;
 }
 
