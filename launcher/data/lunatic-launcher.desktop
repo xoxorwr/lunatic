@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lunatic Launcher
+Comment=Lunatic application launcher for X11
+Exec=lunatic-launcher
+Icon=lunatic-launcher
+Terminal=false
+Categories=Utility;
+StartupNotify=false

@@ -1,0 +1,35 @@
+# Root and panel build output (launcher output is covered by launcher/.gitignore).
+/build/
+/panel/build/
+
+# Native compilation, dependency files and profiling output.
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.d
+*.gch
+*.pch
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+core
+core.[0-9]*
+vgcore.[0-9]*
+
+# Local tooling and Python caches.
+compile_commands.json
+.cache/
+__pycache__/
+*.py[cod]
+
+# Editor and desktop temporary files.
+*~
+*.swp
+*.swo
+.#*
+.DS_Store
+Thumbs.db

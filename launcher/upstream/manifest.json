@@ -1,0 +1,997 @@
+{
+  "repository": "https://gitlab.com/ubuntu-unity/unity/unity",
+  "commit": "2fb9954c7c17736d3f68e0d3ae26683790f812bf",
+  "files": [
+    {
+      "id": "f69de53e7b38ffaf3bdee803cd6171db2b5ce28b",
+      "name": "pch",
+      "type": "tree",
+      "path": "launcher/pch",
+      "mode": "040000"
+    },
+    {
+      "id": "734ace38fe3f0ed97b5c5a3f919f4e449a75f6c6",
+      "name": "AbstractLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/AbstractLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "a10d46e1b868220880fa6f427dff2813da8adbba",
+      "name": "AbstractLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/AbstractLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "a9ca1facc938d34d2d9c172b42b86f8276ae046f",
+      "name": "AbstractVolumeMonitorWrapper.h",
+      "type": "blob",
+      "path": "launcher/AbstractVolumeMonitorWrapper.h",
+      "mode": "100644"
+    },
+    {
+      "id": "0fa0effdc4b21d30ff92f4ba0bb9aedbfb8f8ccc",
+      "name": "ApplicationLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/ApplicationLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "1a21f1f221a679b4e3e51f6aeb8f2a533989586e",
+      "name": "ApplicationLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/ApplicationLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "eece73a88082c431befc4b3a166754de5520498b",
+      "name": "BFBLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/BFBLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "64b79c145bded384bddfbf3453336ce89d289e84",
+      "name": "BFBLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/BFBLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "229d981c9d63e84b07057a9e28869f92679e9a9c",
+      "name": "CMakeLists.txt",
+      "type": "blob",
+      "path": "launcher/CMakeLists.txt",
+      "mode": "100644"
+    },
+    {
+      "id": "5de652fb2a3097ffae5831b548854100841c5723",
+      "name": "CairoBaseWindow.cpp",
+      "type": "blob",
+      "path": "launcher/CairoBaseWindow.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "e35dea6d295bdff3e8566b330af679e898c9aa60",
+      "name": "CairoBaseWindow.h",
+      "type": "blob",
+      "path": "launcher/CairoBaseWindow.h",
+      "mode": "100644"
+    },
+    {
+      "id": "6c17b238e3387e4b87c1667082b296f3d05eacb3",
+      "name": "Decaymulator.cpp",
+      "type": "blob",
+      "path": "launcher/Decaymulator.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "c76be240626b0fdaaa301cf7cb41c7cd7aa319ca",
+      "name": "Decaymulator.h",
+      "type": "blob",
+      "path": "launcher/Decaymulator.h",
+      "mode": "100644"
+    },
+    {
+      "id": "7718a5d51d079cf6ecdd5d832fca459b492d7c35",
+      "name": "DeltaTracker.cpp",
+      "type": "blob",
+      "path": "launcher/DeltaTracker.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "7db121c9627c375ae06c98ed53a8c6085f7d7dda",
+      "name": "DeltaTracker.h",
+      "type": "blob",
+      "path": "launcher/DeltaTracker.h",
+      "mode": "100644"
+    },
+    {
+      "id": "df9a982aad38dc5f4a767f3ca231ad89de2903c9",
+      "name": "DesktopLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/DesktopLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "c170991650d0b9140a73f165bd56e4fec8ea9989",
+      "name": "DesktopLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/DesktopLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "90b1203b95b0aa8e0613fb7fcf424d7f606bb7b9",
+      "name": "DeviceLauncherSection.cpp",
+      "type": "blob",
+      "path": "launcher/DeviceLauncherSection.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "7824cca796798eaac8a617cc05efb0ec99c4d086",
+      "name": "DeviceLauncherSection.h",
+      "type": "blob",
+      "path": "launcher/DeviceLauncherSection.h",
+      "mode": "100644"
+    },
+    {
+      "id": "84af00d429bf47e3894ddf1279fcac647baa2efb",
+      "name": "DeviceNotificationDisplay.h",
+      "type": "blob",
+      "path": "launcher/DeviceNotificationDisplay.h",
+      "mode": "100644"
+    },
+    {
+      "id": "684a057904dc03cd6731cf3e772acb733ad175f7",
+      "name": "DeviceNotificationDisplayImp.cpp",
+      "type": "blob",
+      "path": "launcher/DeviceNotificationDisplayImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "17323a54af7c0a6d2096ab62cefea1986b8022a9",
+      "name": "DeviceNotificationDisplayImp.h",
+      "type": "blob",
+      "path": "launcher/DeviceNotificationDisplayImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "8dda12fc8ca9ac8592e1e035e41c2bfa2702a723",
+      "name": "DevicesSettings.h",
+      "type": "blob",
+      "path": "launcher/DevicesSettings.h",
+      "mode": "100644"
+    },
+    {
+      "id": "25f40a6b2b52aefed58761757e18aed09610d697",
+      "name": "DevicesSettingsImp.cpp",
+      "type": "blob",
+      "path": "launcher/DevicesSettingsImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "658ed4f71867082d8c085e432012ea486f6e5a59",
+      "name": "DevicesSettingsImp.h",
+      "type": "blob",
+      "path": "launcher/DevicesSettingsImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "9482e45f5d9168ea2825d0e9b88578f7a5d3c2c6",
+      "name": "DndData.cpp",
+      "type": "blob",
+      "path": "launcher/DndData.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "3a0f8aebc06ebcd955df7d489a8626d266129470",
+      "name": "DndData.h",
+      "type": "blob",
+      "path": "launcher/DndData.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4e15b50159187f0c16180a972a63b8f413119e46",
+      "name": "EdgeBarrierController.cpp",
+      "type": "blob",
+      "path": "launcher/EdgeBarrierController.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "156e4b394d1335bf65f967df3842bdb45e90fd26",
+      "name": "EdgeBarrierController.h",
+      "type": "blob",
+      "path": "launcher/EdgeBarrierController.h",
+      "mode": "100644"
+    },
+    {
+      "id": "a7bc76de238da2a8daff7a7d7f30ade5259aa4a5",
+      "name": "EdgeBarrierControllerPrivate.h",
+      "type": "blob",
+      "path": "launcher/EdgeBarrierControllerPrivate.h",
+      "mode": "100644"
+    },
+    {
+      "id": "0288f4597fe359ad474aed7193509ab4e567bbe5",
+      "name": "ExpoLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/ExpoLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "f8c7a76ab5f1b62fa69612427e8c0b04a09c7a81",
+      "name": "ExpoLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/ExpoLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "d7acdc84b419964aa24950c99192d42559aef665",
+      "name": "FavoriteStore.cpp",
+      "type": "blob",
+      "path": "launcher/FavoriteStore.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "b31c989adf7009772cc29e168de3357cd523e2dc",
+      "name": "FavoriteStore.h",
+      "type": "blob",
+      "path": "launcher/FavoriteStore.h",
+      "mode": "100644"
+    },
+    {
+      "id": "493e823b1bec82fed126ee6981b9e09d01544a34",
+      "name": "FavoriteStoreGSettings.cpp",
+      "type": "blob",
+      "path": "launcher/FavoriteStoreGSettings.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "2250fef82afd3f65c3a0edc6e5245b8d540cad2b",
+      "name": "FavoriteStoreGSettings.h",
+      "type": "blob",
+      "path": "launcher/FavoriteStoreGSettings.h",
+      "mode": "100644"
+    },
+    {
+      "id": "b4d1d94f48a6c7b631e975b2c475f70f0f609813",
+      "name": "FavoriteStorePrivate.cpp",
+      "type": "blob",
+      "path": "launcher/FavoriteStorePrivate.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "ebd3cfe2a71afd7c9d88d7fcfb71dd30b0e7bd2b",
+      "name": "FavoriteStorePrivate.h",
+      "type": "blob",
+      "path": "launcher/FavoriteStorePrivate.h",
+      "mode": "100644"
+    },
+    {
+      "id": "7e1560a95566603e2341dad4930e581d148f3435",
+      "name": "FileManagerLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/FileManagerLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "3b7d5d46635ccc944acf20b401b1b6b250ea57e4",
+      "name": "FileManagerLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/FileManagerLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "01e4303d370704ecdb0c26ce9fa7ff78ed59bdd0",
+      "name": "HudLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/HudLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "9eb7f59a200ebc0eef4bb248e02848d41eedddfc",
+      "name": "HudLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/HudLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "a4f880af03d216b15346af9738abd20a9a0bd825",
+      "name": "Launcher.cpp",
+      "type": "blob",
+      "path": "launcher/Launcher.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "c745bf1d7ee64eee91dd07670f9089d0ddfc65d0",
+      "name": "Launcher.h",
+      "type": "blob",
+      "path": "launcher/Launcher.h",
+      "mode": "100644"
+    },
+    {
+      "id": "3a38b5f5c1ef974453c9f358143b2f51f7473391",
+      "name": "LauncherController.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherController.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "af5c655bbb6f2eca221b7f10e5ba19238db4892a",
+      "name": "LauncherController.h",
+      "type": "blob",
+      "path": "launcher/LauncherController.h",
+      "mode": "100644"
+    },
+    {
+      "id": "11496bfd1b590f3d592d4ddb1646313f3870e109",
+      "name": "LauncherControllerPrivate.h",
+      "type": "blob",
+      "path": "launcher/LauncherControllerPrivate.h",
+      "mode": "100644"
+    },
+    {
+      "id": "88b1db8422dd389b11cd25f88b5b4f31f8180d88",
+      "name": "LauncherControllerPrivateImpl.h",
+      "type": "blob",
+      "path": "launcher/LauncherControllerPrivateImpl.h",
+      "mode": "100644"
+    },
+    {
+      "id": "6f611f846282a76fa28b44822225e6316ec07e6f",
+      "name": "LauncherDragWindow.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherDragWindow.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "f7a37f952e09b012461a57256a936ebd645b04f8",
+      "name": "LauncherDragWindow.h",
+      "type": "blob",
+      "path": "launcher/LauncherDragWindow.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4817ef08136a6013337577658162b3e6dbc32742",
+      "name": "LauncherEntryRemote.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherEntryRemote.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "e168258884188b6eac3c3e457c28036bde9e2848",
+      "name": "LauncherEntryRemote.h",
+      "type": "blob",
+      "path": "launcher/LauncherEntryRemote.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4df29b3b97f31bc52ea438213e7402996db24745",
+      "name": "LauncherEntryRemoteModel.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherEntryRemoteModel.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "3877e2551a395e5c7624f36f82d6bb4f7ef7d086",
+      "name": "LauncherEntryRemoteModel.h",
+      "type": "blob",
+      "path": "launcher/LauncherEntryRemoteModel.h",
+      "mode": "100644"
+    },
+    {
+      "id": "035dea90dae3eb8ae4701777d5ad9c75f8b89432",
+      "name": "LauncherHideMachine.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherHideMachine.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "df4dd1e1b8b66d3151145f7a18df20badc843aba",
+      "name": "LauncherHideMachine.h",
+      "type": "blob",
+      "path": "launcher/LauncherHideMachine.h",
+      "mode": "100644"
+    },
+    {
+      "id": "fce0db2fdcc2ff3d3421d1eaf7c127feb425016f",
+      "name": "LauncherHoverMachine.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherHoverMachine.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "595b202631ba5321eeef1959127bbb8653bc029b",
+      "name": "LauncherHoverMachine.h",
+      "type": "blob",
+      "path": "launcher/LauncherHoverMachine.h",
+      "mode": "100644"
+    },
+    {
+      "id": "b24065ba26a41400ac13b445cf7a2c7f47584b38",
+      "name": "LauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "55551311230fa4e5433e93bfce97a6a1d43cce5f",
+      "name": "LauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/LauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "e4668ad00b217e08d17e3ee947fa1db0fb8c6430",
+      "name": "LauncherModel.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherModel.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "f7f3b2538ec4e440c5515116e528513b904359b3",
+      "name": "LauncherModel.h",
+      "type": "blob",
+      "path": "launcher/LauncherModel.h",
+      "mode": "100644"
+    },
+    {
+      "id": "3d87ac3fbd9052b33e751b3fb1e6a9317e0d90fc",
+      "name": "LauncherOptions.cpp",
+      "type": "blob",
+      "path": "launcher/LauncherOptions.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "d95b9d2df06e4736ca5c1e07af23658ec05159c6",
+      "name": "LauncherOptions.h",
+      "type": "blob",
+      "path": "launcher/LauncherOptions.h",
+      "mode": "100644"
+    },
+    {
+      "id": "2ba358b76b94b62435f1b1f2ba3bd535ba177b59",
+      "name": "MockLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/MockLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "1ceb65c5ac93e73e6b5b89952a80faec054b25ff",
+      "name": "MockLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/MockLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "1fc2a892e3c8cdced6e97cb3239df7d47f20f3a0",
+      "name": "PointerBarrier.cpp",
+      "type": "blob",
+      "path": "launcher/PointerBarrier.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "27295c17f1afab0add1ae67b57014c30a3b818aa",
+      "name": "PointerBarrier.h",
+      "type": "blob",
+      "path": "launcher/PointerBarrier.h",
+      "mode": "100644"
+    },
+    {
+      "id": "ed5600d50130091e0cb4d40c7c52b3903388aa40",
+      "name": "QuicklistManager.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistManager.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "fd7ae9b301569c6c71da3c865e8da7553daf8d17",
+      "name": "QuicklistManager.h",
+      "type": "blob",
+      "path": "launcher/QuicklistManager.h",
+      "mode": "100644"
+    },
+    {
+      "id": "905c67b914b5491240de1e9d8c92438b48e8f3f6",
+      "name": "QuicklistMenuItem.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItem.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "31e9f03f2c22a40f419425530d523f82064ad8b8",
+      "name": "QuicklistMenuItem.h",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItem.h",
+      "mode": "100644"
+    },
+    {
+      "id": "7ab359dc329141e9ca4b5d45aa04b7015c3af832",
+      "name": "QuicklistMenuItemCheckmark.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemCheckmark.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "28bc32a3c8ffb852818a2af1712f56b0e5cc6fb7",
+      "name": "QuicklistMenuItemCheckmark.h",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemCheckmark.h",
+      "mode": "100644"
+    },
+    {
+      "id": "e93eaaa1e765ef39dda998dc0c66bc1fcbf4b873",
+      "name": "QuicklistMenuItemLabel.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemLabel.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "01b16696285b036a78bc12674bbe7dce2f6d4830",
+      "name": "QuicklistMenuItemLabel.h",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemLabel.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4daa4c9c55f6b0253173355839f5162ba3c41032",
+      "name": "QuicklistMenuItemRadio.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemRadio.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "6d63cc485233dd2af95ecab2470306f53c2d1591",
+      "name": "QuicklistMenuItemRadio.h",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemRadio.h",
+      "mode": "100644"
+    },
+    {
+      "id": "97d09852f6659ae59aac776983b9b1c091cb98f3",
+      "name": "QuicklistMenuItemSeparator.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemSeparator.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "ca30bd43b742f12b06973bd5b4298c1e304e5c6d",
+      "name": "QuicklistMenuItemSeparator.h",
+      "type": "blob",
+      "path": "launcher/QuicklistMenuItemSeparator.h",
+      "mode": "100644"
+    },
+    {
+      "id": "f9a83651ea762b9c549b03f69bb7000d9f546526",
+      "name": "QuicklistView.cpp",
+      "type": "blob",
+      "path": "launcher/QuicklistView.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "af54ab1afce37dfa47ec6f851a62d03684094580",
+      "name": "QuicklistView.h",
+      "type": "blob",
+      "path": "launcher/QuicklistView.h",
+      "mode": "100644"
+    },
+    {
+      "id": "49898b34418cd33985eb2e129d1ce658485fbf6a",
+      "name": "SimpleLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/SimpleLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "9f46dc4ae19a0ebad3053206741de68290bec49b",
+      "name": "SimpleLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/SimpleLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "51e08495e63b8962dd2dcc82f11896b2cfb4acd7",
+      "name": "SingleMonitorLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/SingleMonitorLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "2a6f5d7566567cdeeb0d8c367d4db5b58b122278",
+      "name": "SingleMonitorLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/SingleMonitorLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4900de905c8210601703808c760fed2b9b232023",
+      "name": "SoftwareCenterLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/SoftwareCenterLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "525b937e788fba2bfda857b377f9ef2e409a5dfd",
+      "name": "SoftwareCenterLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/SoftwareCenterLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "86c7cbccdc6a899fbf46f37cc3eb0571afb53cd7",
+      "name": "SpacerLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/SpacerLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "f31303f0c4ae39d93a9e4b05c22614709bdb9a58",
+      "name": "SpacerLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/SpacerLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "7795283577441677da4009648a0b2ad069010b1d",
+      "name": "StandaloneLauncher.cpp",
+      "type": "blob",
+      "path": "launcher/StandaloneLauncher.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "8499cc150c877b01c8523cecdcd6e3e39f44a072",
+      "name": "StandaloneSwitcher.cpp",
+      "type": "blob",
+      "path": "launcher/StandaloneSwitcher.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "fcd50c54dfac1f56a32088c4aeaa1d5a0c1af1e1",
+      "name": "StorageLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/StorageLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "a552f88d5a620afda712e832aa2283869a0e3cd8",
+      "name": "StorageLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/StorageLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "8f400c32c6626eb40d82b996fff1306020a1a7d7",
+      "name": "SwitcherController.cpp",
+      "type": "blob",
+      "path": "launcher/SwitcherController.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "f012912b0b4408b07fbaacd25cae90fd6e7e29a8",
+      "name": "SwitcherController.h",
+      "type": "blob",
+      "path": "launcher/SwitcherController.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4f6c00560cfe3aedc0c423e21c38960c3ea858f1",
+      "name": "SwitcherControllerImpl.h",
+      "type": "blob",
+      "path": "launcher/SwitcherControllerImpl.h",
+      "mode": "100644"
+    },
+    {
+      "id": "4d88894359845be71de6339a0b81c3547a42a90f",
+      "name": "SwitcherModel.cpp",
+      "type": "blob",
+      "path": "launcher/SwitcherModel.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "1fea032043896e2769758f2f6d9318d14e542352",
+      "name": "SwitcherModel.h",
+      "type": "blob",
+      "path": "launcher/SwitcherModel.h",
+      "mode": "100644"
+    },
+    {
+      "id": "6264700bb7d334b59e1ce22103ad248fda2059f6",
+      "name": "SwitcherView.cpp",
+      "type": "blob",
+      "path": "launcher/SwitcherView.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "45f12322589d62e66c023d4f5d9bfa3a5f65562b",
+      "name": "SwitcherView.h",
+      "type": "blob",
+      "path": "launcher/SwitcherView.h",
+      "mode": "100644"
+    },
+    {
+      "id": "67898ee0c1f67c4b4b24be00a8cd42342a3f9dfa",
+      "name": "Tooltip.cpp",
+      "type": "blob",
+      "path": "launcher/Tooltip.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "8841ae4f9b9963e1b8da6d3f7d2c2443e320b54e",
+      "name": "Tooltip.h",
+      "type": "blob",
+      "path": "launcher/Tooltip.h",
+      "mode": "100644"
+    },
+    {
+      "id": "fab58265b8c51bc4d412c1163ac9a2ab2f6c6113",
+      "name": "TooltipManager.cpp",
+      "type": "blob",
+      "path": "launcher/TooltipManager.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "817239d26fdbad13b4c592c31efd6517f470203a",
+      "name": "TooltipManager.h",
+      "type": "blob",
+      "path": "launcher/TooltipManager.h",
+      "mode": "100644"
+    },
+    {
+      "id": "edf5eea34cd5e3411455bdb21ce7a59029b6e108",
+      "name": "TrashLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/TrashLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "3b32cd57238d9c25e6aa3e7c6296663a43526c6e",
+      "name": "TrashLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/TrashLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "a40aae0a276c8896282343a89d0d69183f1ce3c0",
+      "name": "Volume.h",
+      "type": "blob",
+      "path": "launcher/Volume.h",
+      "mode": "100644"
+    },
+    {
+      "id": "e2f272d0747d30e3be51f8de097cf3862ceb7532",
+      "name": "VolumeImp.cpp",
+      "type": "blob",
+      "path": "launcher/VolumeImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "363f7dd6a1e3d0b5c060fe8f68396850124d50ac",
+      "name": "VolumeImp.h",
+      "type": "blob",
+      "path": "launcher/VolumeImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "d8d0a0f1d2cf0cc3cdbe0bd3918b05e3cd77d227",
+      "name": "VolumeLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/VolumeLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "3322db26c0829d5bc32b88f4c957b06947dfda32",
+      "name": "VolumeLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/VolumeLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "8c1e8f7475958f1bc13866aa8eb8a21f805ad70f",
+      "name": "VolumeMonitorWrapper.cpp",
+      "type": "blob",
+      "path": "launcher/VolumeMonitorWrapper.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "383bf80da5777afe2f925d884de8fdf1a0353711",
+      "name": "VolumeMonitorWrapper.h",
+      "type": "blob",
+      "path": "launcher/VolumeMonitorWrapper.h",
+      "mode": "100644"
+    },
+    {
+      "id": "b276739898e3b12d328bb82095c5112f7a89aec2",
+      "name": "WindowedLauncherIcon.cpp",
+      "type": "blob",
+      "path": "launcher/WindowedLauncherIcon.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "c982e54018d2e692d041024d0c016c76c69acf12",
+      "name": "WindowedLauncherIcon.h",
+      "type": "blob",
+      "path": "launcher/WindowedLauncherIcon.h",
+      "mode": "100644"
+    },
+    {
+      "id": "b4e7925dcd30e72ad17472ed1c6c45f711ca7773",
+      "name": "XdndCollectionWindow.h",
+      "type": "blob",
+      "path": "launcher/XdndCollectionWindow.h",
+      "mode": "100644"
+    },
+    {
+      "id": "ac2f8459de6d9dfcc12da4b7d9f6e83adec11d9c",
+      "name": "XdndCollectionWindowImp.cpp",
+      "type": "blob",
+      "path": "launcher/XdndCollectionWindowImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "5d0e1db2e55500602e856310f2d3f2bd21bbb21a",
+      "name": "XdndCollectionWindowImp.h",
+      "type": "blob",
+      "path": "launcher/XdndCollectionWindowImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "ba01887eee84f4275840f4fc8c8644fb10c73d2d",
+      "name": "XdndManager.h",
+      "type": "blob",
+      "path": "launcher/XdndManager.h",
+      "mode": "100644"
+    },
+    {
+      "id": "cae91a3c8e09165c25a3f2ca2c779d3487a6d1e5",
+      "name": "XdndManagerImp.cpp",
+      "type": "blob",
+      "path": "launcher/XdndManagerImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "756b813c8d0e85098e16513444e4ddd3269d8b52",
+      "name": "XdndManagerImp.h",
+      "type": "blob",
+      "path": "launcher/XdndManagerImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "18d7119ccac61fa5a9b15f21579102dedfcfd7cd",
+      "name": "XdndStartStopNotifier.cpp",
+      "type": "blob",
+      "path": "launcher/XdndStartStopNotifier.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "ed5d5087d59c0a1aa4af665f02a33bbbb2ce03fe",
+      "name": "XdndStartStopNotifier.h",
+      "type": "blob",
+      "path": "launcher/XdndStartStopNotifier.h",
+      "mode": "100644"
+    },
+    {
+      "id": "19201ff5596ad651a1e93450c35e9a593d472da4",
+      "name": "XdndStartStopNotifierImp.cpp",
+      "type": "blob",
+      "path": "launcher/XdndStartStopNotifierImp.cpp",
+      "mode": "100644"
+    },
+    {
+      "id": "506f188b96ae21e7f2379cd9d88257ff0905e565",
+      "name": "XdndStartStopNotifierImp.h",
+      "type": "blob",
+      "path": "launcher/XdndStartStopNotifierImp.h",
+      "mode": "100644"
+    },
+    {
+      "id": "569390f4bd0fccd717503169b58b925417da0acc",
+      "name": "launcher_pch.hh",
+      "type": "blob",
+      "path": "launcher/pch/launcher_pch.hh",
+      "mode": "100644"
+    },
+    {
+      "id": "50ab20e2924457261f4d4d739d737ea64844fb0f",
+      "path": "unity-shared/IconRenderer.h",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "473aed2aa9e4b3fdd65550dd166207faa2a14344",
+      "path": "unity-shared/IconTexture.h",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "a63365ebed60ab63e85bed24cfbcb050f2a60c91",
+      "path": "unity-shared/AnimationUtils.h",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "28dcbc50351f957195d7c98e6cedcde4aa78dc86",
+      "path": "resources/launcher_icon_shine_54.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "d2516e0964ed8474c59eeb66ff712dc3600fd51e",
+      "path": "resources/launcher_icon_back_54.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "0c7db75f465e8bfb93f579cecea7302d03abe934",
+      "path": "resources/launcher_icon_shadow_62.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "d2516e0964ed8474c59eeb66ff712dc3600fd51e",
+      "path": "resources/launcher_icon_selected_back_54.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "79e53d2fcf931b935082cbffb4375d80fb1a3395",
+      "path": "resources/launcher_arrow_outline_ltr_19.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "c41cb4ac022024c49d53479ccb1c709fced7f252",
+      "path": "resources/progress_bar_trough.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "19eabed5e12ccb82019a9e92aebb0a2faefea53d",
+      "path": "resources/launcher_icon_edge_54.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "824f7a5d95fcd65e01b1c76cba88c66e497b78b9",
+      "path": "resources/launcher_pressure_effect.png",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "179ec7860b073f5a581a8d28d7af4e57b9033c1b",
+      "path": "resources/launcher_arrow_rtl_19.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "9b8b57436ae19b4e3ceccea267eab813c8d8997d",
+      "path": "resources/launcher_pip_ltr_19.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "0ef89c97f03e8e409a178b68eb2517909932bbc1",
+      "path": "resources/progress_bar_fill.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "1b3387c6aeec8b715e75a06a775c40df6856eb2d",
+      "path": "resources/launcher_icon_glow_62.png",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "f92802b76a12e885f44538613502f3222a40bc88",
+      "path": "resources/launcher_arrow_ltr_19.svg",
+      "type": "blob",
+      "mode": "100644"
+    },
+    {
+      "id": "b6f1ccb0afdf617f4381850678b931c81e5a055a",
+      "path": "resources/launcher_bfb.svg",
+      "type": "blob",
+      "mode": "100644"
+    }
+  ]
+}

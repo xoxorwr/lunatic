@@ -1,0 +1,11 @@
+# Launcher executable and test binaries. Keep the corresponding sources visible.
+/lunatic-launcher
+/tests/test-core
+/tests/test-model
+/tests/test-dash
+/tests/test-application-launch
+/tests/test-renderer
+/tests/test-renderer-gl
+
+# Generated resources, renderer previews and upstream comparison artifacts.
+/build/

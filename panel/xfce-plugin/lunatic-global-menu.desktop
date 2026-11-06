@@ -1,0 +1,9 @@
+[Xfce Panel]
+Type=X-XFCE-PanelPlugin
+Encoding=UTF-8
+Name=Lunatic Global Menu
+Comment=Application menus for the active X11 window
+Icon=applications-system
+X-XFCE-Module=lunatic-global-menu
+X-XFCE-Internal=FALSE
+X-XFCE-API=2.0

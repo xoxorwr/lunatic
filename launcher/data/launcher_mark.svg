@@ -1,0 +1,12 @@
+<!-- Copyright (C) 2026 xoxorwr. SPDX-License-Identifier: GPL-3.0-only -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<title>App grid + crescent</title>
+<defs>
+  <linearGradient id="tile" x2="0" y2="1"><stop stop-color="#62566f"/><stop offset="1" stop-color="#302a3b"/></linearGradient>
+  <mask id="crescent"><rect width="64" height="64" fill="white"/><circle cx="47" cy="36" r="8" fill="black"/></mask>
+</defs>
+<rect x="2" y="2" width="60" height="60" rx="14" fill="url(#tile)" stroke="#b9aaca" stroke-width="1.2"/>
+<path d="M16 3h32a13 13 0 0 1 13 13" fill="none" stroke="white" stroke-opacity=".15"/>
+<g fill="#f8f3ff"><rect x="15" y="15" width="14" height="14" rx="3"/><rect x="35" y="15" width="14" height="14" rx="3"/><rect x="15" y="35" width="14" height="14" rx="3"/></g>
+<circle cx="42" cy="42" r="9" fill="#d5baff" mask="url(#crescent)"/>
+</svg>
