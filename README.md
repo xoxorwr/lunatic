@@ -1,6 +1,6 @@
 # Lunatic
 
-Unity-style launcher and panel plugins, written in C. Each component builds and installs independently.
+Unity7-style launcher/dock and global-menu panel plugins, written in C without dependencies.
 
 <p align="center">
   <img src="docs/img_0.png" alt="Lunatic launcher and global menu on Xfce">
@@ -12,7 +12,7 @@ Distro-independent X11/EWMH dock with application search, pinned apps, window sw
 
 ```sh
 make launcher
-./launcher/unity-launcher
+./launcher/lunatic-launcher
 sudo make install-launcher
 ```
 
@@ -28,7 +28,7 @@ sudo make install-panel
 xfce4-panel -r
 ```
 
-Add **Unity Global Menu** through **Panel → Add New Items**.
+Add **Lunatic Global Menu** through **Panel → Add New Items**.
 
 [Panel requirements, installation and configuration](panel/README.md).
 
@@ -43,6 +43,4 @@ sudo make uninstall     # remove both
 
 Use `uninstall-launcher` or `uninstall-panel` to remove one component.
 
-Before uninstalling, remove the Global Menu items from the panel to disable GTK
-menu export. If enabled, uncheck **Hide title bars of maximized windows** first
-to restore xfwm4 title bars. File removal never edits users’ settings.
+Before uninstalling the panel, follow [removal steps](PACKAGING.md#removal).
