@@ -2,6 +2,10 @@
 #pragma once
 #include <gtk/gtk.h>
 
+/* Control top-level mnemonic underlines without removing keyboard bindings.
+ * Tracks model-created items and later label changes. */
+void panel_menu_bar_set_mnemonics(GtkWidget *bar, gboolean visible);
+
 /* Returned menubars have GTK's floating widget reference. Caller sinks and owns it. */
 GtkWidget *panel_menu_bar_dbusmenu(GDBusConnection *connection, const char *service, const char *path);
 GtkWidget *panel_menu_bar_gmenu(GDBusConnection *connection, const char *service,

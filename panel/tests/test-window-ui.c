@@ -22,6 +22,71 @@ static void clicked_counter(GtkButton *button, gpointer data)
     (void)button;
     (*(guint *)data)++;
 }
+static gboolean has_underline(GtkWidget *label)
+{
+    PangoAttrList *attributes = pango_layout_get_attributes(gtk_label_get_layout(GTK_LABEL(label)));
+    if (!attributes) return FALSE;
+    PangoAttrIterator *iter = pango_attr_list_get_iterator(attributes);
+    gboolean found = FALSE;
+    do {
+        PangoAttribute *attribute = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE);
+        if (attribute && ((PangoAttrInt *)attribute)->value != PANGO_UNDERLINE_NONE) {
+            found = TRUE;
+            break;
+        }
+    } while (pango_attr_iterator_next(iter));
+    pango_attr_iterator_destroy(iter);
+    return found;
+}
+
+static void menu_mnemonics(void)
+{
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *bar = gtk_menu_bar_new();
+    gtk_container_add(GTK_CONTAINER(window), bar);
+    GtkWidget *item = gtk_menu_item_new_with_mnemonic("_File");
+    gtk_menu_shell_append(GTK_MENU_SHELL(bar), item);
+    gtk_widget_show_all(window);
+    GtkWidget *label = gtk_bin_get_child(GTK_BIN(item));
+    guint mnemonic = gtk_label_get_mnemonic_keyval(GTK_LABEL(label));
+    panel_menu_bar_set_mnemonics(bar, FALSE);
+    g_assert_false(has_underline(label));
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(label)), ==, "File");
+    GlobalMenu state = {.menu = bar, .alt_mask = Mod1Mask, .xkb_event = 100};
+    XkbEvent keyboard = {0};
+    keyboard.state.type = state.xkb_event;
+    keyboard.state.xkb_type = XkbStateNotify;
+    keyboard.state.mods = ShiftMask;
+    window_event((GdkXEvent *)&keyboard, NULL, &state);
+    g_assert_false(has_underline(label));
+    keyboard.state.mods = Mod1Mask;
+    window_event((GdkXEvent *)&keyboard, NULL, &state);
+    g_assert_true(has_underline(label));
+    g_assert_cmpuint(gtk_label_get_mnemonic_keyval(GTK_LABEL(label)), ==, mnemonic);
+    /* Late model items and renamed labels inherit the current Alt state. */
+    GtkWidget *late = gtk_menu_item_new_with_mnemonic("_Save __As");
+    gtk_menu_shell_append(GTK_MENU_SHELL(bar), late);
+    GtkWidget *late_label = gtk_bin_get_child(GTK_BIN(late));
+    g_assert_true(has_underline(late_label));
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(late_label)), ==, "Save _As");
+    keyboard.state.mods = 0;
+    window_event((GdkXEvent *)&keyboard, NULL, &state);
+    g_assert_false(has_underline(label));
+    g_assert_false(has_underline(late_label));
+    gtk_menu_item_set_label(GTK_MENU_ITEM(late), "_Édit");
+    g_assert_false(has_underline(late_label));
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(late_label)), ==, "Édit");
+    /* Do not assume Alt always uses Mod1. */
+    state.alt_mask = Mod3Mask;
+    keyboard.state.mods = Mod3Mask;
+    window_event((GdkXEvent *)&keyboard, NULL, &state);
+    g_assert_true(has_underline(late_label));
+    gtk_menu_item_set_label(GTK_MENU_ITEM(late), "__Literal");
+    g_assert_false(has_underline(late_label));
+    g_assert_cmpstr(gtk_label_get_text(GTK_LABEL(late_label)), ==, "_Literal");
+    gtk_widget_destroy(window);
+}
+
 static void hover_controls(void)
 {
     GlobalMenu state = {0};
@@ -85,5 +150,6 @@ int main(int argc, char **argv)
     g_test_init(&argc, &argv, NULL);
     if (!gtk_init_check(&argc, &argv)) { g_print("SKIP: window UI test needs a display\n"); return 77; }
     g_test_add_func("/panel/window-controls-hover", hover_controls);
+    g_test_add_func("/panel/menu-alt-mnemonics", menu_mnemonics);
     return g_test_run();
 }

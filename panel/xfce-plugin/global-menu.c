@@ -8,6 +8,8 @@
 #include "window-control.h"
 #include <string.h>
 #include <X11/Xatom.h>
+#include <X11/XKBlib.h>
+#include <X11/keysym.h>
 #include <gdk/gdkx.h>
 #include <libxfce4panel/libxfce4panel.h>
 
@@ -20,6 +22,9 @@ typedef struct {
     PanelWindowAtoms window_atoms;
     PanelWindowControls window_controls;
     gboolean title_hover, hide_titlebars;
+    gboolean alt_down;
+    int xkb_event;
+    unsigned int alt_mask;
     guint focus_idle;
     gint title_width;
     PanelAppNames *app_names;
@@ -294,6 +299,7 @@ static void set_menu(GlobalMenu *state, GtkWidget *menu)
         gtk_widget_set_hexpand(menu, TRUE);
         gtk_widget_set_halign(menu, GTK_ALIGN_FILL);
         gtk_box_pack_start(GTK_BOX(state->box), menu, TRUE, TRUE, 0);
+        panel_menu_bar_set_mnemonics(menu, state->alt_down);
         xfce_panel_plugin_add_action_widget(state->plugin, menu);
         g_signal_connect_after(menu, "insert", G_CALLBACK(watch_menu_item), state);
         GList *items = gtk_container_get_children(GTK_CONTAINER(menu));
@@ -411,11 +417,39 @@ static void schedule_update(GlobalMenu *state)
         state->idle = g_idle_add(update_active, state);
 }
 
+static void update_alt(GlobalMenu *state, unsigned int modifiers)
+{
+    gboolean down = (modifiers & state->alt_mask) != 0;
+    if (state->alt_down == down) return;
+    state->alt_down = down;
+    if (state->menu) panel_menu_bar_set_mnemonics(state->menu, down);
+}
+
+static void refresh_alt(GlobalMenu *state)
+{
+    state->alt_mask = XkbKeysymToModifiers(state->display, XK_Alt_L) |
+                      XkbKeysymToModifiers(state->display, XK_Alt_R);
+    XkbStateRec keyboard;
+    if (XkbGetState(state->display, XkbUseCoreKbd, &keyboard) == Success)
+        update_alt(state, keyboard.mods);
+}
+
 static GdkFilterReturn window_event(GdkXEvent *raw, GdkEvent *event, gpointer data)
 {
     (void)event;
     GlobalMenu *state = data;
     XEvent *xevent = raw;
+    if (xevent->type == state->xkb_event) {
+        XkbEvent *keyboard = (XkbEvent *)raw;
+        if (keyboard->any.xkb_type == XkbStateNotify)
+            update_alt(state, keyboard->state.mods);
+        else if (keyboard->any.xkb_type == XkbMapNotify) {
+            XkbRefreshKeyboardMapping(&keyboard->map);
+            refresh_alt(state);
+        } else if (keyboard->any.xkb_type == XkbNewKeyboardNotify)
+            refresh_alt(state);
+        return GDK_FILTER_CONTINUE;
+    }
     if (xevent->type == DestroyNotify && xevent->xdestroywindow.window == state->active) {
         state->active = None;
         schedule_update(state);
@@ -731,6 +765,16 @@ static void construct(XfcePanelPlugin *plugin)
         return;
     }
     state->display = gdk_x11_display_get_xdisplay(state->gdisplay);
+    state->xkb_event = -1;
+    int opcode, error_base, major = XkbMajorVersion, minor = XkbMinorVersion;
+    if (XkbQueryExtension(state->display, &opcode, &state->xkb_event, &error_base, &major, &minor)) {
+        XkbSelectEventDetails(state->display, XkbUseCoreKbd, XkbStateNotify,
+                             XkbModifierStateMask, XkbModifierStateMask);
+        XkbSelectEvents(state->display, XkbUseCoreKbd,
+                        XkbMapNotifyMask | XkbNewKeyboardNotifyMask,
+                        XkbMapNotifyMask | XkbNewKeyboardNotifyMask);
+        refresh_alt(state);
+    }
     panel_window_atoms_init(state->display, &state->window_atoms);
     state->root = DefaultRootWindow(state->display);
     state->bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);

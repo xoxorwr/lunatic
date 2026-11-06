@@ -38,6 +38,9 @@ panel hosts are not supported.
 
 ## Controls
 
+Menu mnemonic underlines appear while Alt is held, including when the application
+has focus. Tracking uses XKB events without polling or key grabs.
+
 Hover or focus a fully maximized window's title for **Close**, **Minimize** and
 **Restore**. Right-click → **Properties**:
 

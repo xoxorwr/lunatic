@@ -2,6 +2,69 @@
 #include "menu-view.h"
 #include "dbus-menu.h"
 
+static void mnemonic_label(GtkWidget *widget, gpointer data)
+{
+    GtkWidget *bar = data;
+    if (GTK_IS_LABEL(widget)) {
+        GtkLabel *label = GTK_LABEL(widget);
+        if (!gtk_label_get_use_underline(label) || gtk_label_get_use_markup(label)) {
+            gtk_label_set_pattern(label, NULL);
+            return;
+        }
+        gboolean visible = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(bar), "lunatic-mnemonics-visible"));
+        GString *pattern = g_string_new(NULL);
+        if (visible) {
+            const char *text = gtk_label_get_label(label);
+            for (const char *p = text; *p; p = g_utf8_next_char(p)) {
+                gboolean underline = *p == '_' && p[1];
+                if (underline) p++;
+                g_string_append_c(pattern, underline && *p != '_' ? '_' : ' ');
+            }
+        }
+        gtk_label_set_pattern(label, pattern->str);
+        g_string_free(pattern, TRUE);
+    } else if (GTK_IS_CONTAINER(widget))
+        gtk_container_forall(GTK_CONTAINER(widget), mnemonic_label, bar);
+}
+
+static void mnemonic_label_changed(GObject *object, GParamSpec *pspec, gpointer data)
+{
+    (void)pspec; (void)data;
+    GtkWidget *bar = gtk_widget_get_ancestor(GTK_WIDGET(object), GTK_TYPE_MENU_BAR);
+    if (bar) mnemonic_label(GTK_WIDGET(object), bar);
+}
+
+static void watch_mnemonic_label(GtkWidget *widget, gpointer data)
+{
+    if (GTK_IS_LABEL(widget)) {
+        if (!g_object_get_data(G_OBJECT(widget), "lunatic-mnemonic-watched")) {
+            g_object_set_data(G_OBJECT(widget), "lunatic-mnemonic-watched", GINT_TO_POINTER(1));
+            g_signal_connect(widget, "notify::label", G_CALLBACK(mnemonic_label_changed), NULL);
+            g_signal_connect(widget, "notify::use-underline", G_CALLBACK(mnemonic_label_changed), NULL);
+        }
+        mnemonic_label(widget, data);
+    } else if (GTK_IS_CONTAINER(widget))
+        gtk_container_forall(GTK_CONTAINER(widget), watch_mnemonic_label, data);
+}
+
+static void mnemonic_item_inserted(GtkMenuShell *shell, GtkWidget *item, gint position, gpointer data)
+{
+    (void)position; (void)data;
+    watch_mnemonic_label(item, shell);
+}
+
+void panel_menu_bar_set_mnemonics(GtkWidget *bar, gboolean visible)
+{
+    g_return_if_fail(GTK_IS_MENU_BAR(bar));
+    g_object_set_data(G_OBJECT(bar), "lunatic-mnemonics-visible", GINT_TO_POINTER(visible != FALSE));
+    if (!g_object_get_data(G_OBJECT(bar), "lunatic-mnemonics-watched")) {
+        g_object_set_data(G_OBJECT(bar), "lunatic-mnemonics-watched", GINT_TO_POINTER(1));
+        g_signal_connect_after(bar, "insert", G_CALLBACK(mnemonic_item_inserted), NULL);
+        gtk_container_forall(GTK_CONTAINER(bar), watch_mnemonic_label, bar);
+    } else
+        gtk_container_forall(GTK_CONTAINER(bar), mnemonic_label, bar);
+}
+
 static gboolean valid_path(const char *path)
 {
     return path && g_variant_is_object_path(path);
