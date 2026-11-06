@@ -881,8 +881,6 @@ static const char quicklist_css[] =
     "#ffffff; }"
     "#lunatic-quicklist .quicklist-app-detail { font-size: 11px; color: #bdb6c2; }"
     "#lunatic-quicklist .quicklist-active label { font-weight: bold; color: #ffffff; }"
-    "#lunatic-quicklist menuitem.quicklist-active label.quicklist-active-tag { font-size: 10px; "
-    "color: #ffd0a0; }"
     "#lunatic-quicklist button.quicklist-close { padding: 0; margin: 0; border: 0; "
     "min-width: 18px; min-height: 18px; border-radius: 3px; box-shadow: none; "
     "background: transparent; background-image: none; opacity: 0; color: inherit; }"
@@ -1069,12 +1067,10 @@ static GtkWidget *window_menu_entry(GtkWidget *menu, const Item *item, const Cli
     g_object_set_data(G_OBJECT(entry), "window-close", close);
     g_signal_connect(close, "clicked", G_CALLBACK(quicklist_close_window),
                      (gpointer)(guintptr)client->xid);
-    gtk_box_pack_start(GTK_BOX(box), close, FALSE, FALSE, 0);
-    GtkWidget *image = gtk_image_new();
-    gtk_widget_set_size_request(image, 16, -1);
+    gtk_box_pack_end(GTK_BOX(box), close, FALSE, FALSE, 0);
     if (window_attention_pending(item, client)) {
-        gtk_image_set_from_icon_name(GTK_IMAGE(image), "dialog-warning-symbolic",
-                                     GTK_ICON_SIZE_MENU);
+        GtkWidget *image =
+            gtk_image_new_from_icon_name("dialog-warning-symbolic", GTK_ICON_SIZE_MENU);
         GtkCssProvider *css = gtk_css_provider_new();
         gtk_css_provider_load_from_data(css, "image { color: #ffb326; }", -1, NULL);
         gtk_style_context_add_provider(gtk_widget_get_style_context(image), GTK_STYLE_PROVIDER(css),
@@ -1083,19 +1079,14 @@ static GtkWidget *window_menu_entry(GtkWidget *menu, const Item *item, const Cli
         gtk_widget_set_tooltip_text(entry, "This window requests attention");
         atk_object_set_description(gtk_widget_get_accessible(entry),
                                    "This window requests attention");
+        gtk_box_pack_end(GTK_BOX(box), image, FALSE, FALSE, 0);
     }
     atk_object_set_name(gtk_widget_get_accessible(entry), title);
     GtkWidget *label = gtk_label_new(title);
     gtk_label_set_xalign(GTK_LABEL(label), 0);
     gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
     gtk_label_set_max_width_chars(GTK_LABEL(label), 32);
-    gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), label, TRUE, TRUE, 0);
-    if (client->active) {
-        GtkWidget *tag = gtk_label_new("Active");
-        gtk_style_context_add_class(gtk_widget_get_style_context(tag), "quicklist-active-tag");
-        gtk_box_pack_end(GTK_BOX(box), tag, FALSE, FALSE, 0);
-    }
     gtk_container_add(GTK_CONTAINER(entry), box);
     return entry;
 }
