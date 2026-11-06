@@ -13,7 +13,7 @@ CPPFLAGS += -Icommon $(shell pkg-config --cflags $(PKGS))
 CFLAGS ?= -O2 -g
 CFLAGS += -std=gnu11 -Wall -Wextra -Wformat=2
 LDLIBS += $(shell pkg-config --libs $(PKGS))
-COMMON = common/menu-registry.c common/menu-registrar.c common/menu-view.c common/dbus-menu.c common/remote-menu.c common/menu-model.c common/session-settings.c common/title-label.c common/app-name.c common/window-control.c
+COMMON = common/menu-registry.c common/menu-registrar.c common/menu-view.c common/dbus-menu.c common/remote-menu.c common/menu-model.c common/session-settings.c common/title-label.c common/app-name.c common/window-control.c common/wm-theme.c
 HEADERS = $(wildcard common/*.h)
 .PHONY: all check demo install uninstall clean
 all: build/liblunatic-global-menu.so build/liblunatic-panel-gtk-module.so
@@ -23,6 +23,8 @@ build/liblunatic-global-menu.so: xfce-plugin/global-menu.c $(COMMON) $(HEADERS) 
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -fPIC -shared -Wl,--no-undefined -o $@ xfce-plugin/global-menu.c $(COMMON) $(LDLIBS)
 build/liblunatic-panel-gtk-module.so: common/gtk-module.c common/gtk-menu-export.c common/menu-model.c $(HEADERS) | build
 	$(CC) $(shell pkg-config --cflags gtk+-3.0 gio-2.0 gmodule-2.0 x11) $(CFLAGS) $(LDFLAGS) -fPIC -shared -Wl,--no-undefined -Icommon -o $@ common/gtk-module.c common/gtk-menu-export.c common/menu-model.c $(shell pkg-config --libs gtk+-3.0 gio-2.0 gmodule-2.0 x11)
+build/test-wm-theme: tests/test-wm-theme.c common/wm-theme.c common/wm-theme.h common/window-control.h | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ tests/test-wm-theme.c common/wm-theme.c $(LDLIBS)
 build/test-window-ui: tests/test-window-ui.c xfce-plugin/global-menu.c $(COMMON) $(HEADERS) | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ tests/test-window-ui.c $(COMMON) $(LDLIBS)
 build/test-window-control: tests/test-window-control.c common/window-control.c common/window-control.h | build
@@ -42,7 +44,8 @@ build/legacy-menu-demo: tests/legacy-menu-demo.c | build
 build/menu-demo: tests/menu-demo.c | build
 	$(CC) $(shell pkg-config --cflags gtk+-3.0) $(CFLAGS) $(LDFLAGS) -o $@ $< $(shell pkg-config --libs gtk+-3.0)
 demo: build/menu-demo build/legacy-menu-demo
-check: build/test-registry build/test-menu-model build/test-gtk-export build/test-session-settings build/test-app-name build/test-window-control build/test-window-ui
+check: build/test-wm-theme build/test-registry build/test-menu-model build/test-gtk-export build/test-session-settings build/test-app-name build/test-window-control build/test-window-ui
+	./build/test-wm-theme
 	./build/test-registry
 	./build/test-menu-model
 	./build/test-session-settings

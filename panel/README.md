@@ -38,11 +38,13 @@ panel hosts are not supported.
 
 ## Controls
 
-Menu mnemonic underlines appear while Alt is held, including when the application
-has focus. Tracking uses XKB events without polling or key grabs.
+The title overlays the controls and menus without reserving horizontal space.
+Hover, keyboard focus, or holding Alt reveals the action row; open menus keep it
+visible. Menu underlines appear while Alt is held, using XKB events without grabs.
 
-Hover or focus a fully maximized window's title for **Close**, **Minimize** and
-**Restore**. Right-click → **Properties**:
+Fully maximized windows also show **Close**, **Minimize** and **Restore**, using
+xfwm4's current theme artwork, button order, and hover/pressed states. Theme
+changes reload the cached artwork. Right-click → **Properties**:
 
 - **Maximum title width:** 40–1200 logical pixels; default 200.
 - **Hide maximized title bars:** enabled by default; changes xfwm4's session-wide

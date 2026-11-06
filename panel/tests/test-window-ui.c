@@ -2,6 +2,7 @@
  * Exercise the plugin's real title-area construction and crossing handlers.
  */
 #include "../xfce-plugin/global-menu.c"
+#include <glib/gstdio.h>
 
 static void cross(GtkWidget *widget, GdkEventType type, GdkNotifyType detail, double x, double y)
 {
@@ -87,6 +88,27 @@ static void menu_mnemonics(void)
     gtk_widget_destroy(window);
 }
 
+static PanelWmTheme *test_theme(void)
+{
+    char *directory = g_dir_make_tmp("lunatic-ui-theme-XXXXXX", NULL);
+    const char *names[] = {"close-active.xpm", "hide-active.xpm", "maximize-active.xpm"};
+    const char *xpm = "/* XPM */\nstatic char *x[] = {\n\"4 4 1 1\",\n\"x c #112233\",\n\"xxxx\",\n\"xxxx\",\n\"xxxx\",\n\"xxxx\"};\n";
+    for (guint i = 0; i < 3; i++) {
+        char *path = g_build_filename(directory, names[i], NULL);
+        g_assert_true(g_file_set_contents(path, xpm, -1, NULL));
+        g_free(path);
+    }
+    PanelWmTheme *theme = panel_wm_theme_load(directory, NULL, 1);
+    for (guint i = 0; i < 3; i++) {
+        char *path = g_build_filename(directory, names[i], NULL);
+        g_assert_cmpint(g_unlink(path), ==, 0);
+        g_free(path);
+    }
+    g_assert_cmpint(g_rmdir(directory), ==, 0);
+    g_free(directory);
+    return theme;
+}
+
 static void hover_controls(void)
 {
     GlobalMenu state = {0};
@@ -97,6 +119,13 @@ static void hover_controls(void)
     state.label = panel_title_label_new(200);
     gtk_label_set_markup(GTK_LABEL(state.label), "<b>Editor</b> - Document");
     create_title_area(&state);
+    state.wm_theme = test_theme();
+    g_assert_nonnull(state.wm_theme);
+    for (guint i = 0; i < 3; i++) panel_wm_button_set_theme(state.window_buttons[i], state.wm_theme);
+    GtkWidget *menu = gtk_menu_bar_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_menu_item_new_with_mnemonic("_File"));
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_menu_item_new_with_mnemonic("_Edit"));
+    set_menu(&state, menu);
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_accept_focus(GTK_WINDOW(window), FALSE);
     gtk_container_add(GTK_CONTAINER(window), state.box);
@@ -107,22 +136,28 @@ static void hover_controls(void)
     gdk_window_get_origin(gtk_widget_get_window(window), &root_x, &root_y);
     g_assert_true(gtk_widget_translate_coordinates(state.title_zone, window, 0, 0, &x, &y));
     double inside_x = root_x + x + 2, inside_y = root_y + y + 2;
-    /* GtkStack owns a GdkWindow: its event mask must request these events. */
-    g_assert_true((gtk_widget_get_events(state.title_stack) & GDK_ENTER_NOTIFY_MASK) != 0);
-    g_assert_true((gtk_widget_get_events(state.title_stack) & GDK_LEAVE_NOTIFY_MASK) != 0);
+    g_assert_true(GTK_IS_OVERLAY(state.title_overlay));
+    g_assert_true(gtk_widget_get_parent(state.controls) == state.action_row);
+    g_assert_true(gtk_widget_get_parent(state.menu) == state.action_row);
+    g_assert_true((gtk_widget_get_events(state.title_overlay) & GDK_ENTER_NOTIFY_MASK) != 0);
     reveal_window_controls(&state);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.label);
+    g_assert_false(gtk_widget_get_child_visible(state.action_row));
+    g_assert_true(gtk_widget_get_child_visible(state.label));
+    /* Title width must have zero influence on the action row's request. */
     gint before_min, before_nat, after_min, after_nat;
-    gtk_widget_get_preferred_width(state.title_stack, &before_min, &before_nat);
-    cross(state.title_stack, GDK_ENTER_NOTIFY, GDK_NOTIFY_NONLINEAR, inside_x, inside_y);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.controls);
-    gtk_widget_get_preferred_width(state.title_stack, &after_min, &after_nat);
+    gtk_widget_get_preferred_width(state.title_overlay, &before_min, &before_nat);
+    panel_title_label_set_max_width(PANEL_TITLE_LABEL(state.label), 1200);
+    gtk_label_set_text(GTK_LABEL(state.label), "A very long document title that must never reserve space beside the application menus");
+    gtk_widget_get_preferred_width(state.title_overlay, &after_min, &after_nat);
     g_assert_cmpint(before_min, ==, after_min);
     g_assert_cmpint(before_nat, ==, after_nat);
-    /* Crossing onto children/stack replacement must not hide the buttons. */
+    cross(state.title_overlay, GDK_ENTER_NOTIFY, GDK_NOTIFY_NONLINEAR, inside_x, inside_y);
+    g_assert_true(gtk_widget_get_child_visible(state.action_row));
+    g_assert_false(gtk_widget_get_child_visible(state.label));
+    g_assert_true(gtk_widget_get_visible(state.controls));
     cross(state.title_zone, GDK_LEAVE_NOTIFY, GDK_NOTIFY_INFERIOR, inside_x, inside_y);
     cross(state.window_buttons[0], GDK_ENTER_NOTIFY, GDK_NOTIFY_ANCESTOR, inside_x, inside_y);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.controls);
+    g_assert_true(gtk_widget_get_child_visible(state.action_row));
     guint clicks = 0;
     g_signal_handlers_disconnect_by_func(state.window_buttons[0], G_CALLBACK(control_clicked), &state);
     g_signal_connect(state.window_buttons[0], "clicked", G_CALLBACK(clicked_counter), &clicks);
@@ -130,21 +165,38 @@ static void hover_controls(void)
     gtk_button_clicked(GTK_BUTTON(state.window_buttons[0]));
     g_assert_cmpuint(clicks, ==, 1);
     cross(state.window_buttons[0], GDK_LEAVE_NOTIFY, GDK_NOTIFY_NONLINEAR, root_x + x - 1, root_y + y - 1);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.label);
+    g_assert_false(gtk_widget_get_child_visible(state.action_row));
+    state.alt_mask = Mod1Mask;
+    update_alt(&state, Mod1Mask);
+    g_assert_true(gtk_widget_get_child_visible(state.action_row));
+    update_alt(&state, 0);
+    g_assert_false(gtk_widget_get_child_visible(state.action_row));
+    /* Popups keep the controls/menu row mapped while the pointer is outside. */
+    state.open_popups = 1;
+    reveal_window_controls(&state);
+    g_assert_true(gtk_widget_get_child_visible(state.action_row));
+    state.open_popups = 0;
     state.window_controls.maximized = FALSE;
-    cross(state.title_stack, GDK_ENTER_NOTIFY, GDK_NOTIFY_NONLINEAR, inside_x, inside_y);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.label);
+    cross(state.title_overlay, GDK_ENTER_NOTIFY, GDK_NOTIFY_NONLINEAR, inside_x, inside_y);
+    g_assert_true(gtk_widget_get_child_visible(state.action_row));
+    g_assert_false(gtk_widget_get_visible(state.controls));
     state.window_controls.maximized = TRUE;
     state.window_controls.fullscreen = TRUE;
     reveal_window_controls(&state);
-    g_assert_true(gtk_stack_get_visible_child(GTK_STACK(state.title_stack)) == state.label);
+    g_assert_false(gtk_widget_get_visible(state.controls));
+    set_menu(&state, NULL);
+    g_assert_false(gtk_widget_get_child_visible(state.action_row));
+    g_assert_true(gtk_widget_get_child_visible(state.label));
     state.closing = TRUE;
     g_signal_handlers_disconnect_by_data(state.title_zone, &state);
-    g_signal_handlers_disconnect_by_data(state.title_stack, &state);
+    g_signal_handlers_disconnect_by_data(state.title_overlay, &state);
+    g_signal_handlers_disconnect_by_data(state.action_row, &state);
     for (guint i = 0; i < 3; i++) g_signal_handlers_disconnect_by_data(state.window_buttons[i], &state);
     if (state.focus_idle) g_source_remove(state.focus_idle);
     gtk_widget_destroy(window);
+    panel_wm_theme_unref(state.wm_theme);
 }
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);

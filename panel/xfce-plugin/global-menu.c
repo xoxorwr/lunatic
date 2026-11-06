@@ -6,6 +6,7 @@
 #include "title-label.h"
 #include "app-name.h"
 #include "window-control.h"
+#include "wm-theme.h"
 #include <string.h>
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
@@ -18,7 +19,11 @@ typedef struct {
     gboolean closing;
     XfcePanelPlugin *plugin;
     GtkWidget *box, *label, *menu, *settings_dialog;
-    GtkWidget *title_zone, *title_stack, *controls, *window_buttons[3];
+    GtkWidget *title_zone, *title_overlay, *action_row, *controls, *window_buttons[3];
+    PanelWmTheme *wm_theme;
+    char *wm_theme_name, *button_layout;
+    guint theme_subscription, theme_idle, theme_generation;
+    GCancellable *theme_pending;
     PanelWindowAtoms window_atoms;
     PanelWindowControls window_controls;
     gboolean title_hover, hide_titlebars;
@@ -48,6 +53,7 @@ typedef struct {
 static void schedule_update(GlobalMenu *state);
 static void update_window_controls(GlobalMenu *state);
 static void apply_titleless(GlobalMenu *state);
+static void schedule_theme(GlobalMenu *state);
 
 static void state_unref(GlobalMenu *state)
 {
@@ -150,11 +156,23 @@ static void update_title(GlobalMenu *state)
 
 static void reveal_window_controls(GlobalMenu *state)
 {
-    gboolean focused = gtk_widget_has_focus(state->title_zone) ||
-        gtk_container_get_focus_child(GTK_CONTAINER(state->title_zone)) != NULL;
-    gboolean show = state->active && state->window_controls.maximized &&
-        !state->window_controls.fullscreen && (state->title_hover || focused);
-    gtk_stack_set_visible_child(GTK_STACK(state->title_stack), show ? state->controls : state->label);
+    if (state->closing || !state->title_zone) return;
+    GtkWidget *top = gtk_widget_get_toplevel(state->title_zone);
+    GtkWidget *focus = GTK_IS_WINDOW(top) ? gtk_window_get_focus(GTK_WINDOW(top)) : NULL;
+    gboolean focused = GTK_IS_WINDOW(top) && gtk_window_has_toplevel_focus(GTK_WINDOW(top)) &&
+        focus && (focus == state->title_zone || gtk_widget_is_ancestor(focus, state->title_zone));
+    gboolean controls = state->active && state->window_controls.maximized &&
+        !state->window_controls.fullscreen && state->wm_theme &&
+        (gtk_widget_get_visible(state->window_buttons[0]) ||
+         gtk_widget_get_visible(state->window_buttons[1]) ||
+         gtk_widget_get_visible(state->window_buttons[2]));
+    gtk_widget_set_visible(state->controls, controls);
+    gboolean show = state->active && (controls || state->menu) &&
+        (state->title_hover || focused || state->alt_down || state->open_popups);
+    /* child-visible affects mapping, not size requests. Only the action row
+     * measures the overlay; the title never reserves space beside the menu. */
+    gtk_widget_set_child_visible(state->action_row, show);
+    gtk_widget_set_child_visible(state->label, !show);
 }
 
 static void update_window_controls(GlobalMenu *state)
@@ -198,7 +216,7 @@ static gboolean title_crossing(GtkWidget *widget, GdkEventCrossing *event, gpoin
     if (event->type == GDK_ENTER_NOTIFY)
         state->title_hover = TRUE;
     else if (event->detail != GDK_NOTIFY_INFERIOR)
-        /* Switching stack pages and moving onto a button also produce leave
+        /* Switching overlay layers and moving onto a button also produce leave
          * events. Only hide after the pointer leaves the whole title area. */
         state->title_hover = title_pointer_inside(state, event->x_root, event->y_root);
     reveal_window_controls(state);
@@ -207,8 +225,7 @@ static gboolean title_crossing(GtkWidget *widget, GdkEventCrossing *event, gpoin
 
 static void watch_title_hover(GlobalMenu *state, GtkWidget *widget)
 {
-    /* An invisible event box sits beside descendant GdkWindows, not above
-     * them. GtkStack/buttons must request crossing events themselves. */
+    /* Descendant input windows must also request crossing events. */
     gtk_widget_add_events(widget, GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK);
     g_signal_connect(widget, "enter-notify-event", G_CALLBACK(title_crossing), state);
     g_signal_connect(widget, "leave-notify-event", G_CALLBACK(title_crossing), state);
@@ -225,7 +242,7 @@ static gboolean title_focus(GtkWidget *widget, GdkEventFocus *event, gpointer da
 {
     (void)widget; (void)event;
     GlobalMenu *state = data;
-    if (!state->focus_idle) state->focus_idle = g_idle_add(focus_idle, state);
+    if (!state->closing && !state->focus_idle) state->focus_idle = g_idle_add(focus_idle, state);
     return FALSE;
 }
 static void control_pressed(GtkButton *button, gpointer data)
@@ -263,6 +280,7 @@ static void popup_mapped(GtkWidget *popup, gpointer data)
     GlobalMenu *state = data;
     if (!state->closing && state->open_popups++ == 0)
         xfce_panel_plugin_block_autohide(state->plugin, TRUE);
+    reveal_window_controls(state);
 }
 
 static void popup_unmapped(GtkWidget *popup, gpointer data)
@@ -271,11 +289,13 @@ static void popup_unmapped(GtkWidget *popup, gpointer data)
     GlobalMenu *state = data;
     if (state->open_popups && --state->open_popups == 0)
         xfce_panel_plugin_block_autohide(state->plugin, FALSE);
+    reveal_window_controls(state);
 }
 
 static void watch_menu_item(GtkMenuShell *shell, GtkWidget *item, gint position, gpointer data)
 {
     (void)shell; (void)position;
+    watch_title_hover(data, item);
     GtkWidget *popup = GTK_IS_MENU_ITEM(item) ? gtk_menu_item_get_submenu(GTK_MENU_ITEM(item)) : NULL;
     if (!popup) return;
     /* Only top-level popups need tracking; they remain mapped while a nested
@@ -287,8 +307,10 @@ static void watch_menu_item(GtkMenuShell *shell, GtkWidget *item, gint position,
 static void set_menu(GlobalMenu *state, GtkWidget *menu)
 {
     if (state->menu) {
-        gtk_widget_destroy(state->menu);
-        g_clear_object(&state->menu);
+        GtkWidget *old = state->menu;
+        state->menu = NULL;
+        gtk_widget_destroy(old);
+        g_object_unref(old);
     }
     if (state->open_popups) {
         state->open_popups = 0;
@@ -298,9 +320,10 @@ static void set_menu(GlobalMenu *state, GtkWidget *menu)
         state->menu = g_object_ref_sink(menu);
         gtk_widget_set_hexpand(menu, TRUE);
         gtk_widget_set_halign(menu, GTK_ALIGN_FILL);
-        gtk_box_pack_start(GTK_BOX(state->box), menu, TRUE, TRUE, 0);
+        gtk_box_pack_start(GTK_BOX(state->action_row), menu, TRUE, TRUE, 0);
+        watch_title_hover(state, menu);
         panel_menu_bar_set_mnemonics(menu, state->alt_down);
-        xfce_panel_plugin_add_action_widget(state->plugin, menu);
+        if (state->plugin) xfce_panel_plugin_add_action_widget(state->plugin, menu);
         g_signal_connect_after(menu, "insert", G_CALLBACK(watch_menu_item), state);
         GList *items = gtk_container_get_children(GTK_CONTAINER(menu));
         for (GList *it = items; it; it = it->next)
@@ -308,6 +331,7 @@ static void set_menu(GlobalMenu *state, GtkWidget *menu)
         g_list_free(items);
         gtk_widget_show(menu);
     }
+    reveal_window_controls(state);
 }
 
 static void lookup_ready(GObject *object, GAsyncResult *result, gpointer data)
@@ -423,6 +447,7 @@ static void update_alt(GlobalMenu *state, unsigned int modifiers)
     if (state->alt_down == down) return;
     state->alt_down = down;
     if (state->menu) panel_menu_bar_set_mnemonics(state->menu, down);
+    reveal_window_controls(state);
 }
 
 static void refresh_alt(GlobalMenu *state)
@@ -649,11 +674,16 @@ static void free_data(XfcePanelPlugin *plugin, gpointer data)
     (void)plugin;
     GlobalMenu *state = data;
     state->closing = TRUE;
+    g_signal_handlers_disconnect_by_data(gtk_widget_get_settings(state->box), state);
     if (state->focus_idle) g_source_remove(state->focus_idle);
+    if (state->theme_idle) g_source_remove(state->theme_idle);
+    if (state->theme_pending) g_cancellable_cancel(state->theme_pending);
+    g_clear_object(&state->theme_pending);
     if (state->titleless_setup) g_cancellable_cancel(state->titleless_setup);
     g_clear_object(&state->titleless_setup);
     g_signal_handlers_disconnect_by_data(state->title_zone, state);
-    g_signal_handlers_disconnect_by_data(state->title_stack, state);
+    g_signal_handlers_disconnect_by_data(state->title_overlay, state);
+    g_signal_handlers_disconnect_by_data(state->action_row, state);
     for (guint i = 0; i < G_N_ELEMENTS(state->window_buttons); i++)
         g_signal_handlers_disconnect_by_data(state->window_buttons[i], state);
     if (state->session_setup) g_cancellable_cancel(state->session_setup);
@@ -669,12 +699,16 @@ static void free_data(XfcePanelPlugin *plugin, gpointer data)
     g_clear_object(&state->pending);
     set_menu(state, NULL);
     if (state->bus) {
+        if (state->theme_subscription) g_dbus_connection_signal_unsubscribe(state->bus, state->theme_subscription);
         g_dbus_connection_signal_unsubscribe(state->bus, state->registration_subscription);
         g_dbus_connection_signal_unsubscribe(state->bus, state->owner_subscription);
     }
     panel_menu_registrar_free(state->registrar);
     g_clear_object(&state->bus);
     panel_app_names_free(state->app_names);
+    panel_wm_theme_unref(state->wm_theme);
+    g_free(state->wm_theme_name);
+    g_free(state->button_layout);
     g_clear_pointer(&state->program, g_free);
     state_unref(state);
 }
@@ -690,24 +724,109 @@ static void session_setup_ready(GObject *object, GAsyncResult *result, gpointer 
     }
 }
 
+static void apply_wm_theme(GlobalMenu *state)
+{
+    PanelWmTheme *theme = panel_wm_theme_new(state->wm_theme_name, state->title_zone);
+    PanelWindowCommand order[3];
+    guint count = panel_wm_button_order(state->button_layout, order);
+    for (guint i = 0; i < 3; i++) {
+        panel_wm_button_set_theme(state->window_buttons[i], theme);
+        gtk_widget_hide(state->window_buttons[i]);
+    }
+    for (guint i = 0; i < count; i++) {
+        GtkWidget *button = state->window_buttons[order[i]];
+        gtk_box_reorder_child(GTK_BOX(state->controls), button, i);
+        gtk_widget_set_visible(button, panel_wm_theme_frame(theme, order[i], PANEL_WM_NORMAL) != NULL);
+    }
+    gtk_box_set_spacing(GTK_BOX(state->controls), panel_wm_theme_spacing(theme));
+    panel_wm_theme_unref(state->wm_theme);
+    state->wm_theme = theme;
+    reveal_window_controls(state);
+}
+
+static void wm_theme_ready(GObject *object, GAsyncResult *result, gpointer data)
+{
+    MenuRequest *request = data;
+    GlobalMenu *state = request->state;
+    GError *error = NULL;
+    GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(object), result, &error);
+    if (!state->closing && request->generation == state->theme_generation &&
+        !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+        if (reply) {
+            GVariant *properties = g_variant_get_child_value(reply, 0);
+            const char *name = NULL, *layout = NULL;
+            g_variant_lookup(properties, "/general/theme", "&s", &name);
+            g_variant_lookup(properties, "/general/button_layout", "&s", &layout);
+            g_free(state->wm_theme_name); g_free(state->button_layout);
+            state->wm_theme_name = g_strdup(name); state->button_layout = g_strdup(layout);
+            g_variant_unref(properties);
+        }
+        apply_wm_theme(state);
+    }
+    g_clear_pointer(&reply, g_variant_unref);
+    g_clear_error(&error);
+    state_unref(state);
+    g_free(request);
+}
+
+static gboolean read_wm_theme(gpointer data)
+{
+    GlobalMenu *state = data;
+    state->theme_idle = 0;
+    if (!state->bus) { apply_wm_theme(state); return G_SOURCE_REMOVE; }
+    if (state->theme_pending) g_cancellable_cancel(state->theme_pending);
+    g_clear_object(&state->theme_pending);
+    state->theme_pending = g_cancellable_new();
+    MenuRequest *request = g_new0(MenuRequest, 1);
+    request->state = state; request->generation = ++state->theme_generation;
+    g_atomic_ref_count_inc(&state->references);
+    g_dbus_connection_call(state->bus, "org.xfce.Xfconf", "/org/xfce/Xfconf", "org.xfce.Xfconf",
+        "GetAllProperties", g_variant_new("(ss)", "xfwm4", "/general"), G_VARIANT_TYPE("(a{sv})"),
+        G_DBUS_CALL_FLAGS_NONE, 2000, state->theme_pending, wm_theme_ready, request);
+    return G_SOURCE_REMOVE;
+}
+
+static void schedule_theme(GlobalMenu *state)
+{
+    if (!state->closing && !state->theme_idle) state->theme_idle = g_idle_add(read_wm_theme, state);
+}
+
+static void wm_theme_changed(GDBusConnection *bus, const char *sender, const char *path,
+                             const char *interface, const char *signal, GVariant *parameters, gpointer data)
+{
+    (void)bus; (void)sender; (void)path; (void)interface; (void)signal;
+    const char *channel, *property;
+    GVariant *value;
+    g_variant_get(parameters, "(&s&sv)", &channel, &property, &value);
+    if (g_str_equal(channel, "xfwm4") &&
+        (g_str_equal(property, "/general/theme") || g_str_equal(property, "/general/button_layout")))
+        schedule_theme(data);
+    g_variant_unref(value);
+}
+
+static void wm_style_changed(GObject *object, GParamSpec *pspec, gpointer data)
+{
+    (void)object; (void)pspec;
+    schedule_theme(data);
+}
+
 static void create_title_area(GlobalMenu *state)
 {
     state->title_zone = gtk_event_box_new();
     gtk_event_box_set_visible_window(GTK_EVENT_BOX(state->title_zone), FALSE);
     gtk_widget_set_can_focus(state->title_zone, TRUE);
-    state->title_stack = gtk_stack_new();
-    watch_title_hover(state, state->title_stack);
-    gtk_stack_set_homogeneous(GTK_STACK(state->title_stack), TRUE);
-    gtk_stack_set_transition_type(GTK_STACK(state->title_stack), GTK_STACK_TRANSITION_TYPE_NONE);
+    state->title_overlay = gtk_overlay_new();
+    state->action_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     state->controls = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    const char *icons[] = {"window-close-symbolic", "window-minimize-symbolic", "window-restore-symbolic"};
+    gtk_widget_set_no_show_all(state->controls, TRUE);
     const char *tips[] = {"Close window", "Minimize window", "Restore window"};
     for (guint i = 0; i < G_N_ELEMENTS(state->window_buttons); i++) {
-        GtkWidget *button = gtk_button_new_from_icon_name(icons[i], GTK_ICON_SIZE_MENU);
+        GtkWidget *button = panel_wm_button_new(i);
         state->window_buttons[i] = button;
+        gtk_widget_set_no_show_all(button, TRUE);
         watch_title_hover(state, button);
-        gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
         gtk_widget_set_tooltip_text(button, tips[i]);
+        atk_object_set_name(gtk_widget_get_accessible(button), tips[i]);
         gtk_widget_set_sensitive(button, FALSE);
         g_object_set_data(G_OBJECT(button), "lunatic-window-command", GINT_TO_POINTER(i));
         g_signal_connect(button, "pressed", G_CALLBACK(control_pressed), state);
@@ -716,17 +835,17 @@ static void create_title_area(GlobalMenu *state)
         g_signal_connect(button, "focus-in-event", G_CALLBACK(title_focus), state);
         g_signal_connect(button, "focus-out-event", G_CALLBACK(title_focus), state);
         gtk_box_pack_start(GTK_BOX(state->controls), button, FALSE, FALSE, 0);
+        gtk_widget_show(button);
     }
-    /* Both pages must be visible GTK widgets, even while child-visible is
-     * false, so GtkStack can reserve their size and select either page. */
-    gtk_widget_show(state->label);
-    gtk_widget_show_all(state->controls);
-    gtk_stack_add_named(GTK_STACK(state->title_stack), state->label, "title");
-    gtk_stack_add_named(GTK_STACK(state->title_stack), state->controls, "controls");
-    gtk_stack_set_visible_child(GTK_STACK(state->title_stack), state->label);
-    gtk_container_add(GTK_CONTAINER(state->title_zone), state->title_stack);
-    gtk_box_pack_start(GTK_BOX(state->box), state->title_zone, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(state->action_row), state->controls, FALSE, FALSE, 0);
+    gtk_container_add(GTK_CONTAINER(state->title_overlay), state->action_row);
+    gtk_overlay_add_overlay(GTK_OVERLAY(state->title_overlay), state->label);
+    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(state->title_overlay), state->label, TRUE);
+    gtk_container_add(GTK_CONTAINER(state->title_zone), state->title_overlay);
+    gtk_box_pack_start(GTK_BOX(state->box), state->title_zone, TRUE, TRUE, 0);
     watch_title_hover(state, state->title_zone);
+    watch_title_hover(state, state->title_overlay);
+    watch_title_hover(state, state->action_row);
     g_signal_connect(state->title_zone, "focus-in-event", G_CALLBACK(title_focus), state);
     g_signal_connect(state->title_zone, "focus-out-event", G_CALLBACK(title_focus), state);
 }
@@ -757,7 +876,8 @@ static void construct(XfcePanelPlugin *plugin)
         gtk_widget_set_tooltip_text(state->box, "Global menu requires an X11 session");
         gtk_widget_show_all(GTK_WIDGET(plugin));
         g_signal_handlers_disconnect_by_data(state->title_zone, state);
-        g_signal_handlers_disconnect_by_data(state->title_stack, state);
+        g_signal_handlers_disconnect_by_data(state->title_overlay, state);
+        g_signal_handlers_disconnect_by_data(state->action_row, state);
         for (guint i = 0; i < G_N_ELEMENTS(state->window_buttons); i++)
             g_signal_handlers_disconnect_by_data(state->window_buttons[i], state);
         panel_app_names_free(state->app_names);
@@ -779,6 +899,10 @@ static void construct(XfcePanelPlugin *plugin)
     state->root = DefaultRootWindow(state->display);
     state->bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
     if (state->bus) {
+        state->theme_subscription = g_dbus_connection_signal_subscribe(state->bus,
+            "org.xfce.Xfconf", "org.xfce.Xfconf", "PropertyChanged", "/org/xfce/Xfconf", "xfwm4",
+            G_DBUS_SIGNAL_FLAGS_NONE, wm_theme_changed, state, (GDestroyNotify)state_unref);
+        g_atomic_ref_count_inc(&state->references);
         apply_titleless(state);
         state->session_setup = g_cancellable_new();
         panel_menu_session_setup_async(state->bus, TRUE, state->session_setup, session_setup_ready, NULL);
@@ -806,7 +930,13 @@ static void construct(XfcePanelPlugin *plugin)
     g_signal_connect(plugin, "save", G_CALLBACK(save_settings), state);
     g_signal_connect(plugin, "removed", G_CALLBACK(removed), state);
     g_signal_connect(plugin, "free-data", G_CALLBACK(free_data), state);
+    GtkSettings *settings = gtk_widget_get_settings(state->box);
+    g_signal_connect(settings, "notify::gtk-theme-name", G_CALLBACK(wm_style_changed), state);
+    g_signal_connect(settings, "notify::gtk-application-prefer-dark-theme", G_CALLBACK(wm_style_changed), state);
+    g_signal_connect(state->title_zone, "notify::scale-factor", G_CALLBACK(wm_style_changed), state);
     gtk_widget_show_all(GTK_WIDGET(plugin));
+    reveal_window_controls(state);
+    schedule_theme(state);
     schedule_update(state);
 }
 
