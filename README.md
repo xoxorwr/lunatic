@@ -5,8 +5,9 @@ Unity's launcher and global menu, reimplemented in C with minimal dependencies a
 - [launcher/](launcher/README.md): Unity launcher port, including upstream snapshot, artwork, tests and documentation.
 - [panel/](panel/README.md): global-menu implementation, with shared C code in `panel/common/` and a dedicated plugin for each desktop environment. Currently includes an Xfce adapter in `panel/xfce-plugin/`.
 
-
-![screenshot](docs/img_0.png)
+<p align="center">
+  <img src="docs/img_0.png" alt="Screenshot">
+</p>
 
 ## Build
 
