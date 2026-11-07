@@ -44,3 +44,11 @@ sudo make uninstall     # remove both
 Use `uninstall-launcher` or `uninstall-panel` to remove one component.
 
 Before uninstalling the panel, follow [removal steps](PACKAGING.md#removal).
+
+## GTK theme
+
+Classic Unity 7 Ambiance is included in [theme/gtk](theme/gtk/README.md), with
+GTK 2/3 styles, Xfce panel styling, and native Xfwm4 title bars and controls.
+Install with `sudo make install-theme`; select **Ambiance** for both the GTK
+and window manager themes. An optional settings helper matches Unity's button
+layout and window behavior, with backup and restore support.

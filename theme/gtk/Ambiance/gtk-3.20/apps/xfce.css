@@ -1,0 +1,149 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Xfce GTK 3.20+ adaptation. Colors and gradients follow Ambiance/unity.css.
+ * Keep popup contents separate from the panel's compact, transparent buttons.
+ */
+.xfce4-panel.background {
+    color: @dark_fg_color;
+    background-color: @dark_bg_color;
+    background-image: linear-gradient(to bottom,
+        shade(@dark_bg_color, 1.5), shade(@dark_bg_color, 1.04));
+    border: 0;
+    border-top: 1px solid shade(@dark_bg_color, 1.6);
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: 0 1px #333333;
+    -gtk-icon-shadow: 0 1px #333333;
+}
+
+/* The desktop panel stays lit when an application takes keyboard focus. */
+.xfce4-panel.background:backdrop,
+.xfce4-panel label,
+.xfce4-panel label:backdrop,
+.xfce4-panel image,
+.xfce4-panel image:backdrop {
+    color: @dark_fg_color;
+}
+
+.xfce4-panel.background button,
+.xfce4-panel.background button:backdrop,
+.xfce4-panel.background menubar,
+.xfce4-panel.background menubar > menuitem {
+    color: @dark_fg_color;
+    background: transparent;
+    border: 0;
+    border-image: none;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0 5px;
+    text-shadow: 0 1px #333333;
+    -gtk-icon-shadow: 0 1px #333333;
+}
+
+.xfce4-panel.background menubar {
+    padding: 0;
+}
+
+.xfce4-panel.background button:hover,
+.xfce4-panel.background menubar > menuitem:hover {
+    color: @dark_fg_color;
+    background-image: linear-gradient(to bottom,
+        shade(@dark_bg_color, 1.7), shade(@dark_bg_color, 1.25));
+    box-shadow: inset 1px 0 alpha(white, 0.06), inset -1px 0 alpha(black, 0.2);
+}
+
+.xfce4-panel.background button:checked,
+.xfce4-panel.background button:active {
+    background-image: linear-gradient(to bottom,
+        shade(@dark_bg_color, 0.85), shade(@dark_bg_color, 1.05));
+    box-shadow: inset 1px 0 alpha(black, 0.25), inset -1px 0 alpha(white, 0.06);
+}
+
+.xfce4-panel.background button:disabled,
+.xfce4-panel.background button:disabled label,
+.xfce4-panel.background button:disabled image {
+    color: alpha(@dark_fg_color, 0.45);
+    text-shadow: none;
+    -gtk-icon-shadow: none;
+}
+
+.xfce4-panel.background button:focus {
+    outline-color: alpha(@dark_fg_color, 0.7);
+    outline-offset: -2px;
+}
+
+.xfce4-panel separator {
+    background: transparent;
+    color: alpha(@dark_fg_color, 0.2);
+    min-width: 1px;
+    min-height: 1px;
+}
+
+.xfce4-panel .lunatic-window-title {
+    font-weight: bold;
+}
+
+/* Popup menus belong to the application palette, including their labels. */
+.xfce4-panel menu,
+.xfce4-panel menu label,
+.xfce4-panel menu image,
+.xfce4-panel menu menuitem {
+    color: @fg_color;
+    text-shadow: none;
+    -gtk-icon-shadow: none;
+}
+
+.xfce4-panel menu {
+    background-color: @bg_color;
+}
+
+.xfce4-panel menu menuitem:hover,
+.xfce4-panel menu menuitem:hover label,
+.xfce4-panel menu menuitem:hover image {
+    color: @selected_fg_color;
+}
+
+.xfce4-panel menu menuitem:disabled,
+.xfce4-panel menu menuitem:disabled label,
+.xfce4-panel menu menuitem:disabled image {
+    color: mix(@fg_color, @bg_color, 0.6);
+}
+
+/* Do not turn media-control buttons inside panel popups into panel buttons. */
+.xfce4-panel menu button {
+    color: @fg_color;
+    background-color: shade(@bg_color, 1.02);
+    background-image: none;
+    border: 1px solid shade(@bg_color, 0.75);
+    border-radius: 3px;
+    padding: 3px 6px;
+    text-shadow: none;
+    -gtk-icon-shadow: none;
+}
+
+.xfce4-panel menu button:hover {
+    background-color: shade(@bg_color, 1.08);
+    background-image: none;
+}
+
+.xfce4-panel menu button:active,
+.xfce4-panel menu button:checked {
+    background-color: shade(@bg_color, 0.9);
+    background-image: none;
+}
+
+/* Xfwm's Alt+Tab switcher is independent of Unity's Compiz switcher. */
+#xfwm-tabwin {
+    color: @dark_fg_color;
+    background-color: @dark_bg_color;
+    border: 1px solid shade(@dark_bg_color, 1.6);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+#xfwm-tabwin button:checked {
+    background-color: alpha(@selected_bg_color, 0.35);
+    border-color: @selected_bg_color;
+}

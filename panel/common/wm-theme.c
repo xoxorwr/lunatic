@@ -407,6 +407,9 @@ static void button_finalize(GObject *object)
 static void panel_wm_button_class_init(PanelWmButtonClass *klass)
 {
     GtkWidgetClass *widget = GTK_WIDGET_CLASS(klass);
+    /* Artwork defines the complete allocation; ordinary GtkButton padding
+     * otherwise gives small theme images a negative content allocation. */
+    gtk_widget_class_set_css_name(widget, "lunatic-wm-button");
     widget->draw = button_draw; widget->get_preferred_width = button_width; widget->get_preferred_height = button_height;
     widget->get_preferred_width_for_height = button_width_for_height;
     widget->get_preferred_height_for_width = button_height_for_width;

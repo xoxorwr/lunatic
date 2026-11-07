@@ -859,6 +859,7 @@ static void construct(XfcePanelPlugin *plugin)
     load_settings(state);
     state->box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     state->label = panel_title_label_new(state->title_width);
+    gtk_style_context_add_class(gtk_widget_get_style_context(state->label), "lunatic-window-title");
     gtk_label_set_text(GTK_LABEL(state->label), "Application");
     gtk_widget_set_margin_start(state->label, 4);
     gtk_widget_set_margin_end(state->label, 8);

@@ -11,6 +11,13 @@ only copy/remove files; no display, session bus, or package scripts are required
 Let the package manager remove its owned files. Upgrades must drop obsolete files;
 for old source installs, use the old Makefiles to uninstall first.
 
+The optional Ambiance theme is separate: `make install-theme PREFIX=/usr
+DESTDIR="$pkgdir"` installs `$(DATADIR)/themes/Ambiance/` and
+`$(BINDIR)/lunatic-xfce-settings`. Use `uninstall-theme` to remove them.
+The settings helper runs only when explicitly invoked by the desktop user;
+package scripts must not run it. Restore its saved settings before removing
+the theme if it was used.
+
 ## Paths
 
 All paths accept overrides; `DESTDIR` is prepended for staging.

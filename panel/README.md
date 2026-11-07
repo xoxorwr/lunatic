@@ -51,6 +51,10 @@ changes reload the cached artwork. Right-click → **Properties**:
   setting. Disable before removing the plugin to restore title bars.
   Application-drawn header bars are unaffected.
 
+The bundled [Ambiance theme](../theme/gtk/README.md#xfce) includes native
+Xfwm4 title bars and button artwork. Select **Ambiance** in both Xfce's
+Appearance and Window Manager settings to match the panel and window controls.
+
 ## Development
 
 ```sh

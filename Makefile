@@ -1,4 +1,4 @@
-.PHONY: all launcher panel check check-launcher check-panel check-renderer check-renderer-parity check-upstream clean install uninstall install-launcher install-panel uninstall-launcher uninstall-panel check-install
+.PHONY: all launcher panel check check-launcher check-panel check-renderer check-renderer-parity check-upstream clean install uninstall install-launcher install-panel uninstall-launcher uninstall-panel install-theme uninstall-theme check-install
 all: launcher
 launcher:
 	$(MAKE) -C launcher
@@ -28,3 +28,5 @@ install-launcher uninstall-launcher:
 	$(MAKE) -C launcher $(patsubst %-launcher,%,$@) PREFIX="$(if $(PREFIX),$(PREFIX),/usr/local)"
 install-panel uninstall-panel:
 	$(MAKE) -C panel $(patsubst %-panel,%,$@) PREFIX="$(if $(PREFIX),$(PREFIX),/usr/local)"
+install-theme uninstall-theme:
+	$(MAKE) -C theme/gtk $(patsubst %-theme,%,$@) PREFIX="$(if $(PREFIX),$(PREFIX),/usr/local)"
