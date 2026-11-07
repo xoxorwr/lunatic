@@ -103,6 +103,64 @@ static void desktop_order(void)
     dock = (Launcher){0};
 }
 
+static void pinned_workspace_tracking(void)
+{
+    DockView view = {0};
+    launcher_settings_defaults(&dock.settings);
+    dock.view = &view;
+    dock.views = g_ptr_array_new();
+    dock.items = g_ptr_array_new_with_free_func(item_free);
+    Item *item = model_item("google-chrome.desktop", 0);
+    item->pinned = TRUE;
+    g_assert_false(dock.settings.all_workspaces);
+
+    /* Repeat the actual refresh/filter/activation selection when switching
+     * away from Chrome's workspace and back. Its pinned icon never stops
+     * representing the existing window, even with workspace filtering on. */
+    const unsigned long workspaces[] = {0, 1, 2, 0};
+    for (guint i = 0; i < G_N_ELEMENTS(workspaces); i++) {
+        dock.current_desktop = workspaces[i];
+        begin_window_refresh(item);
+        gboolean visible = launcher_settings_window_visible(
+            &dock.settings, 0, dock.current_desktop);
+        g_assert_true(record_window_presence(item, visible));
+        Client *client = g_new0(Client, 1);
+        client->xid = 123;
+        client->desktop = 0;
+        g_ptr_array_add(item->clients, client);
+        g_assert_true(item->has_windows);
+        g_assert_cmpint(item->seen, ==, visible);
+        g_assert_true(item_activation_client(item, dock.current_desktop) == client);
+        RenderArg arg = item_render_arg(item, 1, 1000);
+        g_assert_cmpuint(arg.running, ==, 1);
+        g_assert_cmpint(arg.running_here, ==, visible);
+    }
+
+    /* Prefer a window on the current workspace when both exist. */
+    dock.current_desktop = 0;
+    Client *remote = g_new0(Client, 1);
+    remote->xid = 456;
+    remote->desktop = 1;
+    g_ptr_array_add(item->clients, remote);
+    g_assert_cmpuint(item_activation_client(item, 0)->xid, ==, 123);
+    g_assert_true(item_activation_client(item, 1) == remote);
+
+    begin_window_refresh(item); /* Last window closes. */
+    g_assert_null(item_activation_client(item, 0));
+    g_assert_cmpuint(item_render_arg(item, 1, 1000).running, ==, 0);
+
+    /* Unpinned icons retain the configured workspace filtering. */
+    item->pinned = FALSE;
+    g_assert_false(record_window_presence(item, FALSE));
+    g_assert_false(item->seen);
+    g_assert_true(item->has_windows);
+    g_assert_true(record_window_presence(item, TRUE));
+    g_assert_true(item->seen);
+    g_ptr_array_unref(dock.items);
+    g_ptr_array_unref(dock.views);
+    dock = (Launcher){0};
+}
+
 static void invalid_drag_sources(void)
 {
     DockView view = {0};
@@ -781,6 +839,7 @@ int main(int argc, char **argv)
     g_test_init(&argc, &argv, NULL);
     g_test_add_func("/host/desktop-order-and-layout", desktop_order);
     g_test_add_func("/host/invalid-drag-sources", invalid_drag_sources);
+    g_test_add_func("/host/pinned-workspace-tracking", pinned_workspace_tracking);
     g_test_add_func("/host/launcherentry-urgency", launcherentry_urgency);
     g_test_add_func("/host/badge-app-lifetime", badge_app_lifetime);
     g_test_add_func("/host/hover-targets-and-tooltip-position", hover_targets_and_tooltip_position);

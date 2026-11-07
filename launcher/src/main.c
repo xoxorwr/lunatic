@@ -578,6 +578,19 @@ static void launch(Item *item, const char *action)
     g_object_unref(context);
 }
 
+static Client *item_activation_client(const Item *item, unsigned long desktop)
+{
+    if (!item->clients->len)
+        return NULL;
+    Client *selected = g_ptr_array_index(item->clients, item->clients->len - 1);
+    for (guint i = 0; i < item->clients->len; i++) {
+        Client *client = g_ptr_array_index(item->clients, i);
+        if (client->desktop == desktop || client->desktop == 0xffffffffUL)
+            selected = client;
+    }
+    return selected;
+}
+
 static void item_clicked(GtkButton *button, gpointer data)
 {
     (void)button;
@@ -615,11 +628,7 @@ static void item_clicked(GtkButton *button, gpointer data)
         XIconifyWindow(dock.display, client->xid, DefaultScreen(dock.display));
         gdk_x11_display_error_trap_pop_ignored(dock.gdisplay);
     } else {
-        for (guint i = 0; i < item->clients->len; i++) {
-            Client *candidate = g_ptr_array_index(item->clients, i);
-            if (candidate->desktop == cardinal(dock.root, "_NET_CURRENT_DESKTOP", 0))
-                client = candidate;
-        }
+        client = item_activation_client(item, dock.current_desktop);
         activate(client->xid);
     }
 }
@@ -1195,6 +1204,17 @@ static void begin_window_refresh(Item *item)
     item->active = item->window_urgent = item->seen = FALSE;
 }
 
+static gboolean record_window_presence(Item *item, gboolean visible)
+{
+    if (!item)
+        return FALSE;
+    item->has_windows = TRUE;
+    item->seen |= visible;
+    /* Pinned icons remain on every workspace, so retain their windows for
+     * running markers, quicklists and activation on every workspace too. */
+    return visible || item->pinned;
+}
+
 static void clear_closed_app_overlays(Item *item)
 {
     if (item->had_windows && !item->has_windows) {
@@ -1275,13 +1295,8 @@ static void refresh(void)
         Item *item = matched ? matched : find_item(id);
         if (!item && visible)
             item = add_item(id, app, hint.res_class);
-        if (item)
-            item->has_windows = TRUE;
-        /* Track application lifetime across all workspaces, while retaining
-         * the configured workspace filter for the visible task list. */
-        if (!visible || !item)
+        if (!record_window_presence(item, visible))
             goto window_done;
-        item->seen = TRUE;
         Client *client = g_new0(Client, 1);
         client->xid = window;
         client->active = window == active;
