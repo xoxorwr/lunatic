@@ -44,7 +44,8 @@ windows can cover the dock. Use `--no-autohide` to keep it visible otherwise.
 | --- | --- |
 | Focus application / show active group's windows | Click icon |
 | New instance | Middle-click or Shift-click |
-| Window list, desktop actions, pin/unpin, close | Right-click icon |
+| Window list, desktop actions, pin/unpin, close all | Right-click icon |
+| Window stacking / move to workspace | Eye / workspace submenu beside each window |
 | Pin / reorder | Drop a desktop file / drag an icon |
 | Open Dash search | Top button or tap left Super |
 | Search / launch / dismiss | Type / Enter / Escape; clicking outside also dismisses |

@@ -25,6 +25,7 @@ static unsigned long workspace;
 static gboolean cached_window;
 static GdkWindowType cached_type;
 static guint activation_requests;
+static GArray *captured_requests;
 static const Window chrome_window = 200;
 
 Atom fixture_atom(GdkDisplay *display, const gchar *name)
@@ -100,6 +101,10 @@ Status fixture_send(Display *display, Window window, Bool propagate, long mask, 
 {
     (void)display; (void)propagate; (void)mask;
     g_assert_cmpuint(window, ==, dock.root);
+    if (captured_requests) {
+        g_array_append_val(captured_requests, event->xclient);
+        return 1;
+    }
     if (event->xclient.message_type == atom("_NET_ACTIVE_WINDOW")) {
         g_assert_cmpuint(event->xclient.window, ==, chrome_window);
         activation_requests++;
@@ -198,10 +203,55 @@ static void tracking(gconstpointer foreign)
     dock = (Launcher){0};
 }
 
+static void window_actions(void)
+{
+    atoms = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    captured_requests = g_array_new(FALSE, FALSE, sizeof(XClientMessageEvent));
+    dock.root = 100;
+    for (int mode = 0; mode < 3; mode++) {
+        g_array_set_size(captured_requests, 0);
+        set_window_visibility(chrome_window, mode);
+        g_assert_cmpuint(captured_requests->len, ==, mode ? 2 : 1);
+        for (guint i = 0; i < captured_requests->len; i++) {
+            XClientMessageEvent *event = &g_array_index(captured_requests, XClientMessageEvent, i);
+            g_assert_cmpuint(event->window, ==, chrome_window);
+            g_assert_cmpuint(event->message_type, ==, atom("_NET_WM_STATE"));
+            g_assert_cmpint(event->format, ==, 32);
+            g_assert_cmpint(event->data.l[0], ==, i ? 1 : 0);
+            g_assert_cmpint(event->data.l[3], ==, 2); /* EWMH pager source. */
+            if (!mode) {
+                g_assert_cmpuint(event->data.l[1], ==, atom("_NET_WM_STATE_ABOVE"));
+                g_assert_cmpuint(event->data.l[2], ==, atom("_NET_WM_STATE_BELOW"));
+            } else {
+                gboolean above = i ? mode == 1 : mode == 2;
+                g_assert_cmpuint(event->data.l[1], ==,
+                                 atom(above ? "_NET_WM_STATE_ABOVE" : "_NET_WM_STATE_BELOW"));
+                g_assert_cmpint(event->data.l[2], ==, 0);
+            }
+        }
+    }
+    const unsigned long destinations[] = {0, 3};
+    for (guint i = 0; i < G_N_ELEMENTS(destinations); i++) {
+        g_array_set_size(captured_requests, 0);
+        move_window_to_workspace(chrome_window, destinations[i]);
+        g_assert_cmpuint(captured_requests->len, ==, 1);
+        XClientMessageEvent *event = &g_array_index(captured_requests, XClientMessageEvent, 0);
+        g_assert_cmpuint(event->window, ==, chrome_window);
+        g_assert_cmpuint(event->message_type, ==, atom("_NET_WM_DESKTOP"));
+        g_assert_cmpuint(event->data.l[0], ==, destinations[i]);
+        g_assert_cmpint(event->data.l[1], ==, 2);
+    }
+    g_array_unref(captured_requests);
+    captured_requests = NULL;
+    g_hash_table_unref(atoms);
+    dock = (Launcher){0};
+}
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
     g_test_add_data_func("/tracking/workspace-round-trip", GINT_TO_POINTER(FALSE), tracking);
     g_test_add_data_func("/tracking/foreign-window-round-trip", GINT_TO_POINTER(TRUE), tracking);
+    g_test_add_func("/tracking/window-menu-actions", window_actions);
     return g_test_run();
 }

@@ -51,12 +51,12 @@ void quicklist_paint_frame(cairo_t *cr, double width, double height, gboolean po
     cairo_set_line_width(cr, 6);
     cairo_stroke_preserve(cr);
     cairo_pattern_t *fill = cairo_pattern_create_linear(0, top, 0, bottom);
-    cairo_pattern_add_color_stop_rgba(fill, 0, .19, .18, .205, .99);
-    cairo_pattern_add_color_stop_rgba(fill, 1, .105, .10, .12, .99);
+    cairo_pattern_add_color_stop_rgba(fill, 0, .18, .15, .25, .99);
+    cairo_pattern_add_color_stop_rgba(fill, 1, .10, .09, .15, .99);
     cairo_set_source(cr, fill);
     cairo_fill_preserve(cr);
     cairo_pattern_destroy(fill);
-    cairo_set_source_rgba(cr, 1, 1, 1, .22);
+    cairo_set_source_rgba(cr, .76, .62, .94, .62);
     cairo_set_line_width(cr, 1);
     cairo_stroke(cr);
     cairo_restore(cr);
@@ -72,7 +72,7 @@ void quicklist_paint_row(cairo_t *cr, double width, double height, gboolean acti
     if (active)
         cairo_set_source_rgba(cr, .46, .32, .22, hovered ? .95 : .70);
     else
-        cairo_set_source_rgba(cr, 1, 1, 1, .13);
+        cairo_set_source_rgba(cr, .57, .30, .76, .40);
     cairo_fill_preserve(cr);
     if (active) {
         cairo_set_source_rgba(cr, 1, .66, .32, .30);

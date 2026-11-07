@@ -283,7 +283,8 @@ static char *window_text(Window window, const char *name)
     return value;
 }
 
-static void send_message(Window window, const char *name, long a, long b, long c)
+static void send_message_source(Window window, const char *name, long a, long b, long c,
+                                long source)
 {
     XEvent event = {0};
     event.xclient.type = ClientMessage;
@@ -293,9 +294,15 @@ static void send_message(Window window, const char *name, long a, long b, long c
     event.xclient.data.l[0] = a;
     event.xclient.data.l[1] = b;
     event.xclient.data.l[2] = c;
+    event.xclient.data.l[3] = source;
     XSendEvent(dock.display, dock.root, False, SubstructureRedirectMask | SubstructureNotifyMask,
                &event);
     XFlush(dock.display);
+}
+
+static void send_message(Window window, const char *name, long a, long b, long c)
+{
+    send_message_source(window, name, a, b, c, 0);
 }
 
 static gboolean window_attention_pending(const Item *item, const Client *client)
@@ -844,13 +851,28 @@ static gboolean quicklist_frame_draw(GtkWidget *widget, cairo_t *cr, gpointer da
      * into those windows repeats it with their padding/scroll translation. */
     if (!gtk_cairo_should_draw_window(cr, menu_window))
         return FALSE;
-    GdkWindow *canvas_window = gtk_widget_get_window(view->items_box);
-    if (!canvas_window)
-        return FALSE;
     int ignored, icon_root_y, menu_root_y;
-    double icon_y = view->menu_item ? view->menu_item->layout.center : view->menu_icon_y;
-    gdk_window_get_root_coords(canvas_window, 0, (int)round(icon_y), &ignored, &icon_root_y);
+    gboolean pointer_left = !view || view->menu_pointer_left;
     gdk_window_get_root_coords(menu_window, 0, 0, &ignored, &menu_root_y);
+    if (view) {
+        GdkWindow *canvas_window = gtk_widget_get_window(view->items_box);
+        if (!canvas_window)
+            return FALSE;
+        double icon_y = view->menu_item ? view->menu_item->layout.center : view->menu_icon_y;
+        gdk_window_get_root_coords(canvas_window, 0, (int)round(icon_y), &ignored, &icon_root_y);
+    } else {
+        GtkWidget *entry = gtk_menu_get_attach_widget(GTK_MENU(widget));
+        if (!entry)
+            return FALSE;
+        GtkWidget *parent = gtk_widget_get_parent(entry);
+        int x, y, root_x;
+        if (!gtk_widget_translate_coordinates(entry, parent, 0, 0, &x, &y))
+            return FALSE;
+        gdk_window_get_root_coords(
+            gtk_widget_get_window(parent), x + gtk_widget_get_allocated_width(entry) / 2,
+            y + gtk_widget_get_allocated_height(entry) / 2, &root_x, &icon_root_y);
+        pointer_left = ignored >= root_x;
+    }
     double arrow_y =
         quicklist_arrow_y(icon_root_y, menu_root_y, gtk_widget_get_allocated_height(widget));
     cairo_save(cr);
@@ -859,8 +881,7 @@ static gboolean quicklist_frame_draw(GtkWidget *widget, cairo_t *cr, gpointer da
     cairo_paint(cr);
     cairo_restore(cr);
     quicklist_paint_frame(cr, gtk_widget_get_allocated_width(widget),
-                          gtk_widget_get_allocated_height(widget), view->menu_pointer_left,
-                          arrow_y);
+                          gtk_widget_get_allocated_height(widget), pointer_left, arrow_y);
     return FALSE;
 }
 
@@ -876,26 +897,38 @@ static void quicklist_remove_style(GtkWidget *menu, gpointer data)
 static const char quicklist_css[] =
     "#lunatic-quicklist-window { background: transparent; border: 0; box-shadow: none; }"
     "#lunatic-quicklist { background: transparent; border: 0; box-shadow: none; "
-    "padding: 6px 14px; color: #f7f5f8; }"
+    "padding: 10px 18px; color: #f7f5f8; }"
     "#lunatic-quicklist.pointer-left { padding-left: 18px; padding-right: 6px; }"
     "#lunatic-quicklist.pointer-right { padding-left: 6px; padding-right: 18px; }"
     "#lunatic-quicklist menuitem { background: transparent; background-image: none; "
-    "border: 0; box-shadow: none; padding: 3px 8px; min-height: 0; color: #f7f5f8; }"
+    "border: 0; box-shadow: none; padding: 6px 10px; min-height: 0; color: #f7f5f8; }"
     "#lunatic-quicklist menuitem label { color: inherit; text-shadow: none; }"
     "#lunatic-quicklist menuitem:disabled { color: #bdb6c2; opacity: 1; }"
     "#lunatic-quicklist .quicklist-domain { font-size: 10px; font-weight: bold; "
     "color: #aaa1b0; padding-top: 1px; padding-bottom: 1px; min-height: 0; }"
-    "#lunatic-quicklist .quicklist-app { padding: 4px 8px; }"
-    "#lunatic-quicklist .quicklist-app-name { font-weight: bold; color: "
+    "#lunatic-quicklist .quicklist-app { padding: 10px 10px 12px; }"
+    "#lunatic-quicklist .quicklist-app-name { font-size: 15px; font-weight: bold; color: "
     "#ffffff; }"
     "#lunatic-quicklist .quicklist-app-detail { font-size: 11px; color: #bdb6c2; }"
     "#lunatic-quicklist .quicklist-active label { font-weight: bold; color: #ffffff; }"
-    "#lunatic-quicklist button.quicklist-close { padding: 0; margin: 0; border: 0; "
-    "min-width: 18px; min-height: 18px; border-radius: 3px; box-shadow: none; "
+    "#lunatic-quicklist .quicklist-close { padding: 0; margin: 0; border: 0; "
+    "min-width: 16px; min-height: 16px; border-radius: 3px; box-shadow: none; "
     "background: transparent; background-image: none; opacity: 0; color: inherit; }"
-    "#lunatic-quicklist menuitem.quicklist-window:hover button.quicklist-close { opacity: 1; }"
-    "#lunatic-quicklist button.quicklist-close:hover { background: rgba(255,255,255,0.20); }"
-    "#lunatic-quicklist button.quicklist-close:active { background: rgba(255,255,255,0.32); }"
+    "#lunatic-quicklist menuitem.quicklist-window:hover .quicklist-close { opacity: 1; }"
+    "#lunatic-quicklist menuitem.quicklist-window:hover image.quicklist-window-icon { opacity: 0; }"
+    "#lunatic-quicklist .quicklist-close:hover { background: rgba(255,255,255,0.20); }"
+    "#lunatic-quicklist .quicklist-close:active { background: rgba(255,255,255,0.32); }"
+    "#lunatic-quicklist .quicklist-control { padding: 6px 8px; }"
+    "#lunatic-quicklist .quicklist-control:hover { background: rgba(150,75,205,0.45); "
+    "border-radius: 5px; }"
+    "#lunatic-quicklist .quicklist-choice { background: rgba(150,75,205,0.45); "
+    "border-radius: 5px; }"
+    "#lunatic-quicklist .quicklist-control arrow { min-width: 10px; min-height: 10px; }"
+    "#lunatic-quicklist radio { -gtk-icon-source: none; background: transparent; "
+    "background-image: none; border: 0; box-shadow: none; min-width: 0; min-height: 0; "
+    "padding: 0; margin: 0; }"
+    "#lunatic-quicklist .quicklist-subtitle { font-size: 14px; font-weight: bold; "
+    "padding: 6px 10px; color: #f7f5f8; }"
     "#lunatic-quicklist separator { background: rgba(255,255,255,0.13); min-height: 1px; "
     "margin: 3px 8px; border: 0; }";
 
@@ -906,7 +939,8 @@ static void quicklist_style(GtkWidget *menu, DockView *view)
     if (GTK_IS_WINDOW(popup))
         gtk_widget_set_name(popup, "lunatic-quicklist-window");
     gtk_style_context_add_class(gtk_widget_get_style_context(menu),
-                                view->menu_pointer_left ? "pointer-left" : "pointer-right");
+                                view ? (view->menu_pointer_left ? "pointer-left" : "pointer-right")
+                                     : "quicklist-submenu");
     gtk_menu_set_reserve_toggle_size(GTK_MENU(menu), FALSE);
     g_object_set(menu, "anchor-hints", GDK_ANCHOR_SLIDE_Y | GDK_ANCHOR_RESIZE_Y, NULL);
     GdkVisual *visual = gdk_screen_get_rgba_visual(gtk_widget_get_screen(menu));
@@ -927,43 +961,70 @@ static void quicklist_style(GtkWidget *menu, DockView *view)
     g_signal_connect(menu, "draw", G_CALLBACK(quicklist_frame_draw), view);
 }
 
+/* GTK menu columns have equal widths. The title spans six, leaving one
+ * compact column for each submenu. GTK owns pointer grabs and key navigation. */
+#define QUICKLIST_COLUMNS 8
+static void quicklist_append(GtkWidget *menu, GtkWidget *entry)
+{
+    guint row = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(menu), "next-row"));
+    guint columns =
+        gtk_style_context_has_class(gtk_widget_get_style_context(menu), "quicklist-submenu")
+            ? 1
+            : QUICKLIST_COLUMNS;
+    gtk_menu_attach(GTK_MENU(menu), entry, 0, columns, row, row + 1);
+    g_object_set_data(G_OBJECT(menu), "next-row", GUINT_TO_POINTER(row + 1));
+}
+
+static GtkWidget *quicklist_content(const char *label, const char *icon_name)
+{
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    GtkWidget *image = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_MENU);
+    gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
+    GtkWidget *text = gtk_label_new(label);
+    gtk_label_set_xalign(GTK_LABEL(text), 0);
+    gtk_box_pack_start(GTK_BOX(box), text, TRUE, TRUE, 0);
+    return box;
+}
+
 static void quicklist_section(GtkWidget *menu, const char *title)
 {
     GList *children = gtk_container_get_children(GTK_CONTAINER(menu));
     if (children)
-        gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
+        quicklist_append(menu, gtk_separator_menu_item_new());
     g_list_free(children);
     if (title) {
         GtkWidget *entry = gtk_menu_item_new_with_label(title);
-        gtk_style_context_add_class(gtk_widget_get_style_context(entry), "quicklist-domain");
+        gboolean submenu =
+            gtk_style_context_has_class(gtk_widget_get_style_context(menu), "quicklist-submenu");
+        gtk_style_context_add_class(gtk_widget_get_style_context(entry),
+                                    submenu ? "quicklist-subtitle" : "quicklist-domain");
         gtk_widget_set_sensitive(entry, FALSE);
-        gtk_menu_shell_append(GTK_MENU_SHELL(menu), entry);
+        quicklist_append(menu, entry);
     }
 }
 
 static void quicklist_app_header(GtkWidget *menu, const Item *item)
 {
-    quicklist_section(menu, NULL);
     GtkWidget *entry = gtk_menu_item_new();
     gtk_widget_set_sensitive(entry, FALSE);
     gtk_style_context_add_class(gtk_widget_get_style_context(entry), "quicklist-app");
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *image = NULL;
     GIcon *icon = item->app ? g_app_info_get_icon(G_APP_INFO(item->app)) : NULL;
     if (icon)
-        image = gtk_image_new_from_gicon(icon, GTK_ICON_SIZE_MENU);
+        image = gtk_image_new_from_gicon(icon, GTK_ICON_SIZE_DND);
     else if (item->icon) {
-        GdkPixbuf *small = gdk_pixbuf_scale_simple(item->icon, 16, 16, GDK_INTERP_BILINEAR);
+        GdkPixbuf *small = gdk_pixbuf_scale_simple(item->icon, 40, 40, GDK_INTERP_BILINEAR);
         image = gtk_image_new_from_pixbuf(small);
         g_object_unref(small);
     }
     if (image)
         gtk_box_pack_start(GTK_BOX(box), image, FALSE, FALSE, 0);
-    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *name = gtk_label_new(item->name);
     gtk_label_set_xalign(GTK_LABEL(name), 0);
     gtk_label_set_ellipsize(GTK_LABEL(name), PANGO_ELLIPSIZE_END);
-    gtk_label_set_max_width_chars(GTK_LABEL(name), 26);
+    gtk_label_set_max_width_chars(GTK_LABEL(name), 36);
     gtk_style_context_add_class(gtk_widget_get_style_context(name), "quicklist-app-name");
     gtk_box_pack_start(GTK_BOX(text), name, TRUE, TRUE, 0);
     char *detail =
@@ -975,19 +1036,139 @@ static void quicklist_app_header(GtkWidget *menu, const Item *item)
     gtk_box_pack_end(GTK_BOX(text), subtitle, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), text, TRUE, TRUE, 0);
     gtk_container_add(GTK_CONTAINER(entry), box);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), entry);
+    quicklist_append(menu, entry);
 }
 
 static GtkWidget *menu_entry(GtkWidget *menu, const char *label, GCallback callback, gpointer data)
 {
     GtkWidget *entry = gtk_menu_item_new_with_label(label);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), entry);
+    quicklist_append(menu, entry);
     g_signal_connect(entry, "activate", callback, data);
     g_signal_connect(entry, "draw", G_CALLBACK(quicklist_row_draw), NULL);
     return entry;
 }
 
-static void quicklist_close_window(GtkButton *button, gpointer data)
+static GtkWidget *menu_icon_entry(GtkWidget *menu, const char *label, const char *icon,
+                                  GCallback callback, gpointer data)
+{
+    GtkWidget *entry = menu_entry(menu, "", callback, data);
+    gtk_container_remove(GTK_CONTAINER(entry), gtk_bin_get_child(GTK_BIN(entry)));
+    gtk_container_add(GTK_CONTAINER(entry), quicklist_content(label, icon));
+    return entry;
+}
+
+static GtkWidget *menu_choice_entry(GtkWidget *menu, const char *label, const char *icon,
+                                    gboolean selected, GCallback callback, Window window)
+{
+    GtkWidget *entry = gtk_check_menu_item_new();
+    gtk_check_menu_item_set_draw_as_radio(GTK_CHECK_MENU_ITEM(entry), TRUE);
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(entry), selected);
+    GtkWidget *box = quicklist_content(label, icon);
+    GtkWidget *check = gtk_image_new_from_icon_name("object-select-symbolic", GTK_ICON_SIZE_MENU);
+    gtk_widget_set_opacity(check, selected ? 1 : 0);
+    gtk_box_pack_start(GTK_BOX(box), check, FALSE, FALSE, 0);
+    gtk_box_reorder_child(GTK_BOX(box), check, 0);
+    gtk_container_add(GTK_CONTAINER(entry), box);
+    quicklist_append(menu, entry);
+    if (selected)
+        gtk_style_context_add_class(gtk_widget_get_style_context(entry), "quicklist-choice");
+    g_signal_connect(entry, "activate", callback, (gpointer)(guintptr)window);
+    g_signal_connect(entry, "draw", G_CALLBACK(quicklist_row_draw), NULL);
+    return entry;
+}
+
+static void set_window_visibility(Window window, int mode)
+{
+    Atom above = atom("_NET_WM_STATE_ABOVE"), below = atom("_NET_WM_STATE_BELOW");
+    /* Remove the opposing state first. Normal removes both in one request. */
+    send_message_source(window, "_NET_WM_STATE", 0, mode == 1 ? below : above,
+                        mode == 0 ? below : 0, 2);
+    if (mode)
+        send_message_source(window, "_NET_WM_STATE", 1, mode == 1 ? above : below, 0, 2);
+}
+
+static void menu_visibility(GtkMenuItem *entry, gpointer data)
+{
+    int mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(entry), "visibility"));
+    set_window_visibility((Window)(guintptr)data, mode);
+}
+
+static void move_window_to_workspace(Window window, unsigned long workspace)
+{
+    send_message(window, "_NET_WM_DESKTOP", (long)workspace, 2, 0);
+}
+
+static void menu_workspace(GtkMenuItem *entry, gpointer data)
+{
+    unsigned long workspace = (guintptr)g_object_get_data(G_OBJECT(entry), "workspace");
+    move_window_to_workspace((Window)(guintptr)data, workspace);
+}
+
+static GtkWidget *window_submenu(GtkWidget *menu, const Client *client, gboolean visibility,
+                                 guint row)
+{
+    GtkWidget *control = gtk_menu_item_new();
+    GtkWidget *image = gtk_image_new_from_icon_name(
+        visibility ? "view-reveal-symbolic" : "view-grid-symbolic", GTK_ICON_SIZE_MENU);
+    gtk_container_add(GTK_CONTAINER(control), image);
+    gtk_style_context_add_class(gtk_widget_get_style_context(control), "quicklist-control");
+    const char *title = visibility ? "Visibility" : "Move to Workspace";
+    char *accessible = g_strdup_printf("%s: %s", title, client->title ? client->title : "Window");
+    atk_object_set_name(gtk_widget_get_accessible(control), accessible);
+    g_free(accessible);
+    gtk_widget_set_tooltip_text(control, title);
+    guint col = visibility ? QUICKLIST_COLUMNS - 2 : QUICKLIST_COLUMNS - 1;
+    gtk_menu_attach(GTK_MENU(menu), control, col, col + 1, row, row + 1);
+    GtkWidget *submenu = gtk_menu_new();
+    quicklist_style(submenu, NULL);
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(control), submenu);
+    quicklist_section(submenu, title);
+    if (visibility) {
+        const char *labels[] = {"Same as other windows", "Always on top",
+                                "Always below other windows"};
+        const char *icons[] = {"view-reveal-symbolic", "view-pin-symbolic",
+                               "view-conceal-symbolic"};
+        int selected = has_atom(client->xid, "_NET_WM_STATE", "_NET_WM_STATE_ABOVE")   ? 1
+                       : has_atom(client->xid, "_NET_WM_STATE", "_NET_WM_STATE_BELOW") ? 2
+                                                                                       : 0;
+        const int order[] = {1, 0, 2};
+        for (guint i = 0; i < G_N_ELEMENTS(order); i++) {
+            int mode = order[i];
+            GtkWidget *choice =
+                menu_choice_entry(submenu, labels[mode], icons[mode], mode == selected,
+                                  G_CALLBACK(menu_visibility), client->xid);
+            g_object_set_data(G_OBJECT(choice), "visibility", GINT_TO_POINTER(mode));
+        }
+    } else {
+        unsigned long count = cardinal(dock.root, "_NET_NUMBER_OF_DESKTOPS", 1);
+        /* _NET_DESKTOP_NAMES is NUL-separated; read it with its byte length. */
+        unsigned long length = 0;
+        unsigned char *raw =
+            property(dock.root, "_NET_DESKTOP_NAMES", atom("UTF8_STRING"), 8, &length);
+        gsize offset = 0;
+        for (unsigned long i = 0; i < MIN(count, 256); i++) {
+            char *label = NULL;
+            if (raw && offset < length) {
+                gsize len = strnlen((char *)raw + offset, length - offset);
+                if (len)
+                    label = g_utf8_make_valid((char *)raw + offset, len);
+                offset += len + 1;
+            }
+            if (!label)
+                label = g_strdup_printf("Workspace %lu", i + 1);
+            GtkWidget *choice =
+                menu_choice_entry(submenu, label, "view-grid-symbolic", i == client->desktop,
+                                  G_CALLBACK(menu_workspace), client->xid);
+            g_free(label);
+            g_object_set_data(G_OBJECT(choice), "workspace", (gpointer)(guintptr)i);
+        }
+        if (raw)
+            XFree(raw);
+    }
+    return control;
+}
+
+static void quicklist_close_window(GtkWidget *button, gpointer data)
 {
     Window window = (Window)(guintptr)data;
     GtkWidget *menu = gtk_widget_get_ancestor(GTK_WIDGET(button), GTK_TYPE_MENU);
@@ -1048,35 +1229,53 @@ static gboolean quicklist_close_event(GtkWidget *menu, GdkEventButton *event, gp
         quicklist_close_gesture(&pressed, target, event->type, event->button, &close);
     g_object_set_data(G_OBJECT(menu), "close-pressed", pressed);
     if (close)
-        gtk_button_clicked(GTK_BUTTON(target));
+        quicklist_close_window(target, g_object_get_data(G_OBJECT(target), "close-window"));
     return handled;
 }
 
 static GtkWidget *window_menu_entry(GtkWidget *menu, const Item *item, const Client *client,
                                     const char *fallback)
 {
-    GtkWidget *entry =
-        menu_entry(menu, "", G_CALLBACK(menu_activate), (gpointer)(guintptr)client->xid);
-    gtk_container_remove(GTK_CONTAINER(entry), gtk_bin_get_child(GTK_BIN(entry)));
+    guint row = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(menu), "next-row"));
+    GtkWidget *entry = gtk_menu_item_new();
+    gtk_menu_attach(GTK_MENU(menu), entry, 0, QUICKLIST_COLUMNS - 2, row, row + 1);
+    g_object_set_data(G_OBJECT(menu), "next-row", GUINT_TO_POINTER(row + 1));
+    g_signal_connect(entry, "activate", G_CALLBACK(menu_activate), (gpointer)(guintptr)client->xid);
+    g_signal_connect(entry, "draw", G_CALLBACK(quicklist_row_draw), NULL);
+    window_submenu(menu, client, TRUE, row);
+    window_submenu(menu, client, FALSE, row);
     if (client->active) {
         g_object_set_data(G_OBJECT(entry), "active-window", GINT_TO_POINTER(1));
         gtk_style_context_add_class(gtk_widget_get_style_context(entry), "quicklist-active");
     }
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_style_context_add_class(gtk_widget_get_style_context(entry), "quicklist-window");
-    GtkWidget *close = gtk_button_new_from_icon_name("window-close-symbolic", GTK_ICON_SIZE_MENU);
+    const char *title = client->title ? client->title : fallback;
+    GtkWidget *icon = gtk_image_new_from_icon_name("folder-symbolic", GTK_ICON_SIZE_MENU);
+    if (item->app && g_app_info_get_icon(G_APP_INFO(item->app)))
+        gtk_image_set_from_gicon(GTK_IMAGE(icon), g_app_info_get_icon(G_APP_INFO(item->app)),
+                                 GTK_ICON_SIZE_MENU);
+    /* Share the existing icon slot: hover never changes the title allocation. */
+    gtk_style_context_add_class(gtk_widget_get_style_context(icon), "quicklist-window-icon");
+    GtkWidget *slot = gtk_overlay_new();
+    gtk_container_add(GTK_CONTAINER(slot), icon);
+    GtkWidget *close = gtk_image_new_from_icon_name("window-close-symbolic", GTK_ICON_SIZE_MENU);
     gtk_style_context_add_class(gtk_widget_get_style_context(close), "quicklist-close");
     gtk_widget_set_can_focus(close, FALSE);
-    gtk_widget_set_focus_on_click(close, FALSE);
-    const char *title = client->title ? client->title : fallback;
+    gtk_widget_set_halign(close, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(close, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(slot), close);
+    /* A windowless, pass-through icon keeps the row hovered. Menu-level hit
+     * testing handles the click, without activating the window underneath. */
+    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(slot), close, TRUE);
+    atk_object_set_role(gtk_widget_get_accessible(close), ATK_ROLE_PUSH_BUTTON);
     char *close_label = g_strdup_printf("Close %s", title);
     atk_object_set_name(gtk_widget_get_accessible(close), close_label);
     g_free(close_label);
     gtk_widget_set_tooltip_text(close, "Close window");
     g_object_set_data(G_OBJECT(entry), "window-close", close);
-    g_signal_connect(close, "clicked", G_CALLBACK(quicklist_close_window),
-                     (gpointer)(guintptr)client->xid);
-    gtk_box_pack_end(GTK_BOX(box), close, FALSE, FALSE, 0);
+    g_object_set_data(G_OBJECT(close), "close-window", (gpointer)(guintptr)client->xid);
+    gtk_box_pack_start(GTK_BOX(box), slot, FALSE, FALSE, 0);
     if (window_attention_pending(item, client)) {
         GtkWidget *image =
             gtk_image_new_from_icon_name("dialog-warning-symbolic", GTK_ICON_SIZE_MENU);
@@ -1113,6 +1312,19 @@ static void menu_done(GtkWidget *menu, gpointer data)
     schedule_refresh();
 }
 
+static const char *quicklist_action_icon(const char *action)
+{
+    if (!g_ascii_strcasecmp(action, "Home"))
+        return "user-home-symbolic";
+    if (!g_ascii_strcasecmp(action, "Computer"))
+        return "computer-symbolic";
+    if (!g_ascii_strcasecmp(action, "Trash"))
+        return "user-trash-symbolic";
+    if (!g_ascii_strcasecmp(action, "NewWindow") || !g_ascii_strcasecmp(action, "new-window"))
+        return "window-new-symbolic";
+    return "system-run-symbolic";
+}
+
 static GtkWidget *build_quicklist(Item *item, DockView *view)
 {
     GtkWidget *menu = gtk_menu_new();
@@ -1120,38 +1332,42 @@ static GtkWidget *build_quicklist(Item *item, DockView *view)
     g_signal_connect(menu, "button-press-event", G_CALLBACK(quicklist_close_event), NULL);
     g_signal_connect(menu, "button-release-event", G_CALLBACK(quicklist_close_event), NULL);
     if (item) {
+        quicklist_app_header(menu, item);
         if (item->app || item->clients->len) {
-            quicklist_section(menu, "ACTIONS");
+            quicklist_section(menu, NULL);
             if (item->app) {
-                menu_entry(menu, "New window", G_CALLBACK(menu_launch), item);
+                menu_icon_entry(menu, "New window", "list-add-symbolic", G_CALLBACK(menu_launch),
+                                item);
                 const char *const *actions = g_desktop_app_info_list_actions(item->app);
                 for (guint i = 0; actions && actions[i]; i++) {
                     char *name = g_desktop_app_info_get_action_name(item->app, actions[i]);
-                    GtkWidget *entry = menu_entry(menu, name, G_CALLBACK(menu_launch), item);
+                    GtkWidget *entry =
+                        menu_icon_entry(menu, name, quicklist_action_icon(actions[i]),
+                                        G_CALLBACK(menu_launch), item);
                     g_object_set_data_full(G_OBJECT(entry), "action", g_strdup(actions[i]), g_free);
                     g_free(name);
                 }
             }
             if (item->clients->len)
-                menu_entry(menu, "Close all windows", G_CALLBACK(menu_close), item);
+                menu_icon_entry(menu, "Close all windows", "window-close-symbolic",
+                                G_CALLBACK(menu_close), item);
         }
-        quicklist_app_header(menu, item);
         if (!item->urgency_acknowledged && item->urgent_senders &&
             g_hash_table_size(item->urgent_senders)) {
             GtkWidget *notice = gtk_menu_item_new_with_label("Application requests attention");
             gtk_widget_set_sensitive(notice, FALSE);
-            gtk_menu_shell_append(GTK_MENU_SHELL(menu), notice);
+            quicklist_append(menu, notice);
         }
         if (item->clients->len) {
-            quicklist_section(menu, "WINDOWS");
+            quicklist_section(menu, "OPEN WINDOWS");
             for (guint i = 0; i < item->clients->len; i++)
                 window_menu_entry(menu, item, g_ptr_array_index(item->clients, i), item->name);
         }
     }
     if (item && item->app) {
         quicklist_section(menu, NULL);
-        menu_entry(menu, item->pinned ? "Unpin from launcher" : "Pin to launcher",
-                   G_CALLBACK(menu_pin), item);
+        menu_icon_entry(menu, item->pinned ? "Unpin from launcher" : "Pin to launcher",
+                        "view-pin-symbolic", G_CALLBACK(menu_pin), item);
     } else if (!item) {
         quicklist_section(menu, "LAUNCHER");
         menu_entry(menu, "Settings…", G_CALLBACK(show_settings), view);
