@@ -85,53 +85,45 @@
     font-weight: bold;
 }
 
-/* Popup menus belong to the application palette, including their labels. */
-.xfce4-panel menu,
-.xfce4-panel menu label,
-.xfce4-panel menu image,
-.xfce4-panel menu menuitem {
-    color: @fg_color;
+/* Keep Ambiance's native dark popup palette and item states. */
+.xfce4-panel menu {
+    color: @dark_fg_color;
     text-shadow: none;
     -gtk-icon-shadow: none;
 }
 
-.xfce4-panel menu {
-    background-color: @bg_color;
+.xfce4-panel menu label,
+.xfce4-panel menu label:backdrop,
+.xfce4-panel menu image,
+.xfce4-panel menu image:backdrop {
+    color: @dark_fg_color;
 }
 
-.xfce4-panel menu menuitem:hover,
 .xfce4-panel menu menuitem:hover label,
 .xfce4-panel menu menuitem:hover image {
     color: @selected_fg_color;
 }
 
-.xfce4-panel menu menuitem:disabled,
 .xfce4-panel menu menuitem:disabled label,
 .xfce4-panel menu menuitem:disabled image {
-    color: mix(@fg_color, @bg_color, 0.6);
+    color: mix(@dark_fg_color, @dark_bg_color, 0.5);
 }
 
-/* Do not turn media-control buttons inside panel popups into panel buttons. */
-.xfce4-panel menu button {
-    color: @fg_color;
-    background-color: shade(@bg_color, 1.02);
+/* Restore native menu buttons after the compact panel-button rules above. */
+.xfce4-panel menu button,
+.xfce4-panel menu button:hover,
+.xfce4-panel menu button:active,
+.xfce4-panel menu button:checked,
+.xfce4-panel menu button:disabled {
+    color: @dark_fg_color;
+    background-color: shade(@dark_bg_color, 1.08);
     background-image: none;
-    border: 1px solid shade(@bg_color, 0.75);
-    border-radius: 3px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
     padding: 3px 6px;
     text-shadow: none;
     -gtk-icon-shadow: none;
-}
-
-.xfce4-panel menu button:hover {
-    background-color: shade(@bg_color, 1.08);
-    background-image: none;
-}
-
-.xfce4-panel menu button:active,
-.xfce4-panel menu button:checked {
-    background-color: shade(@bg_color, 0.9);
-    background-image: none;
 }
 
 /* Xfwm's Alt+Tab switcher is independent of Unity's Compiz switcher. */
