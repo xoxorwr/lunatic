@@ -99,6 +99,25 @@ void hide_machine_tick(HideMachine *m, gint64 now)
     }
 }
 
+void launcher_reveal_configure(HideMachine *m, float responsiveness)
+{
+    /* Keep the float arithmetic and truncation of Launcher::ConfigureBarrier. */
+    float decay = ((responsiveness - 1) * .3f) + 1;
+    float reveal = ((responsiveness - 1) * .025f) + 1;
+    m->reveal_pressure = 2000 * reveal;
+    m->decay_rate = 1500 * decay;
+}
+
+int launcher_barrier_velocity(double dx, double dy, unsigned int millis)
+{
+    return millis ? sqrt(dx * dx + dy * dy) / millis * 1000 : 1;
+}
+
+int launcher_barrier_smoothed(int accum, int count, float responsiveness)
+{
+    return count > 0 ? MIN((int)(600 * responsiveness), accum / count) : 0;
+}
+
 gboolean launcher_should_hover(gboolean hidden, gboolean mouse_over, gboolean bfb_over,
                                gboolean key_nav, gboolean quicklist, gboolean in_action)
 {

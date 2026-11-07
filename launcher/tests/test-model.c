@@ -841,9 +841,59 @@ static void attention_timing(void)
     g_assert_false(pulsing);
 }
 
+static void barrier_reveal_rules(void)
+{
+    LauncherSettings previous = dock.settings;
+    launcher_settings_defaults(&dock.settings);
+    dock.settings.autohide = TRUE;
+    for (int side = DOCK_LEFT; side <= DOCK_RIGHT; side++) {
+        dock.settings.position = side;
+        DockView view = {.geometry = {100, 0, 800, 600}, .top = 24, .height = 576,
+                         .width = 61, .scale = 1, .hidden = TRUE};
+        hide_machine_init(&view.hide);
+        hide_machine_mode(&view.hide, AUTOHIDE, 0);
+        hide_machine_quirk(&view.hide, LAUNCHER_HIDDEN, TRUE, 0);
+        int x = side == DOCK_RIGHT ? 899 : 100;
+        g_assert_cmpfloat_with_epsilon(reveal_responsiveness(), 2, .00001);
+        /* First contact is observed without adding reveal pressure. */
+        g_assert_cmpint(barrier_reveal_pressure(&view, x, 300, 1200, TRUE, 0, 0), ==,
+                        BARRIER_HANDLED);
+        g_assert_cmpint(view.hide.pressure, ==, 0);
+        g_assert_true(view.hide.should_hide);
+        barrier_reveal_pressure(&view, x, 300, 1000, FALSE, 0, 75);
+        g_assert_cmpint(view.hide.pressure, ==, 1000);
+        /* Leaving does not reset pressure. Only the 10 ms decay reduces it. */
+        hide_machine_tick(&view.hide, 175);
+        g_assert_cmpint(view.hide.pressure, ==, 810);
+        g_assert_cmpint(barrier_reveal_pressure(&view, x, 10, 1200, FALSE, 0, 175), ==,
+                        BARRIER_RELEASE);
+        g_assert_cmpint(view.hide.pressure, ==, 810);
+        g_assert_cmpint(barrier_reveal_pressure(&view, x, 300, 1200, FALSE, Button1Mask,
+                                               175), ==, BARRIER_RELEASE);
+        g_assert_cmpint(view.hide.pressure, ==, 810);
+        barrier_reveal_pressure(&view, x, 300, 1240, FALSE, 0, 175);
+        g_assert_cmpint(view.hide.pressure, ==, 2050);
+        g_assert_true(view.hide.should_hide); /* Strictly greater, not >=. */
+        barrier_reveal_pressure(&view, x, 300, 1, FALSE, 0, 175);
+        g_assert_false(view.hide.should_hide);
+        g_assert_cmpint(view.hide.pressure, ==, 0);
+        g_assert_true(view.hide.quirks & MOUSE_MOVE_POST_REVEAL);
+        /* The physical coordinates from XI events respect display scale. */
+        view.scale = 2;
+        view.hidden = TRUE;
+        g_assert_cmpint(barrier_reveal_pressure(&view, x * 2, 300 * 2, 100, TRUE, 0,
+                                               200), ==, BARRIER_HANDLED);
+        view.barrier_released_until = 1200;
+        g_assert_cmpint(barrier_reveal_pressure(&view, x * 2, 300 * 2, 100, FALSE, 0,
+                                               300), ==, BARRIER_RELEASE);
+    }
+    dock.settings = previous;
+}
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
+    g_test_add_func("/host/barrier-reveal-rules", barrier_reveal_rules);
     g_test_add_func("/host/desktop-order-and-layout", desktop_order);
     g_test_add_func("/host/invalid-drag-sources", invalid_drag_sources);
     g_test_add_func("/host/pinned-workspace-tracking", pinned_workspace_tracking);

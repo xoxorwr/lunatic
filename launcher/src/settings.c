@@ -6,7 +6,7 @@ void launcher_settings_defaults(LauncherSettings *s)
 {
     *s = (LauncherSettings){.hide_animation = HIDE_FADE_SLIDE,
                             .show_trash = TRUE,
-                            .reveal_sensitivity = 50,
+                            .reveal_sensitivity = (2.0 - .2) / 7.8 * 100,
                             .opacity = .6667,
                             .color_mode = COLOR_WALLPAPER,
                             .visibility = VISIBILITY_PRIMARY,

@@ -1,6 +1,7 @@
 # Launcher executable and test binaries. Keep the corresponding sources visible.
 /lunatic-launcher
 /tests/test-core
+/tests/test-barrier
 /tests/test-model
 /tests/test-tracking
 /tests/test-dash

@@ -44,6 +44,10 @@ void hide_machine_mode(HideMachine *machine, HideMode mode, gint64 now);
 void hide_machine_quirk(HideMachine *machine, HideQuirk quirk, gboolean value, gint64 now);
 void hide_machine_pressure(HideMachine *machine, int pressure, gint64 now);
 void hide_machine_tick(HideMachine *machine, gint64 now);
+/* PointerBarrier.cpp / Launcher::ConfigureBarrier; responsiveness is 0.2–8.0. */
+void launcher_reveal_configure(HideMachine *machine, float responsiveness);
+int launcher_barrier_velocity(double dx, double dy, unsigned int millis);
+int launcher_barrier_smoothed(int accum, int count, float responsiveness);
 gboolean launcher_should_hover(gboolean hidden, gboolean mouse_over, gboolean bfb_over,
                                gboolean key_nav, gboolean quicklist, gboolean in_action);
 

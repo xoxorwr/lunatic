@@ -9,6 +9,7 @@ The C++ snapshot is reference material; production builds compile only C.
 | Upstream | C implementation | Adaptation |
 | --- | --- | --- |
 | `LauncherHideMachine.cpp`, `LauncherHoverMachine.cpp` | `src/launcher-core.c` | Flags, hide/hover decisions, reveal threshold, 400 ms hide delay |
+| `PointerBarrier.cpp`, `EdgeBarrierController.cpp`, `Launcher::ConfigureBarrier` | `src/main.c`, `src/launcher-core.c` | XI 2.3/XFixes 5 barrier velocity, first-contact suppression, 75 ms smoothing, threshold/decay responsiveness, fast-crossing and release rules; vertical edge mirrored for right placement |
 | `Decaymulator.cpp` | `src/launcher-core.c` | Integer decay at 10 ms intervals |
 | `Launcher.cpp` layout and animation functions | `src/launcher-core.c` | Folding, shelf placement, drag limits, pulse/wiggle curves |
 | `LauncherIcon.cpp` color/count rendering | `src/launcher-core.c`, `src/renderer.c` | Original color weighting, HSV adjustments and count geometry |
@@ -34,9 +35,16 @@ updates; the animation timer slows from 16 ms to 100 ms when idle.
 ## Validation
 
 - Original/C comparisons: all 262,144 hide and 128 hover flag combinations.
+- Reveal comparisons: original C++ velocity/smoothing functions and 18,090 pressure/decay steps across 201 responsiveness values.
+- Nested X11 barrier tests: stationary contact, continued pushes, fast crossings, both edges and cleanup.
 - CPU rendering: scale, transparency, hide modes, positions and cache release.
 - Optional GL parity: 14 scenes; measured maximum channel error 3/255, limit 4/255.
 - Offscreen CPU timing on the test host: about 1.4 ms/frame at 1×, 5.4 ms at 2×.
 
 Live window-manager integration, keyboard grabs, drag/drop and monitor changes
 need desktop testing. See [features and limits](README.md) and [memory notes](README.md#memory).
+
+The percentage sensitivity setting maps linearly to responsiveness 0.2–8.0.
+Unity's appearance panel uses that range directly, with default 2.0:
+[cc-appearance-panel.c](https://gitlab.com/ubuntu-unity/unity/unity-control-center/-/blob/master/panels/appearance/cc-appearance-panel.c).
+Saved percentages are retained; new configurations default to about 23.08%.

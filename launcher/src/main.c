@@ -100,6 +100,15 @@ typedef struct {
     unsigned long last_struts[12];
     gboolean struts_set;
     gint64 last_urgency_trace;
+    PointerBarrier barrier;
+    int barrier_x, barrier_top, barrier_bottom;
+    BarrierEventID barrier_last_event, smoothing_event;
+    int barrier_device, smoothing_x, smoothing_y, smoothing_count, smoothing_accum;
+    guint smoothing_timer, pressure_timer;
+    gint64 barrier_released_until;
+    gboolean barrier_release_once;
+    HideMachine overcome;
+    int break_y;
 } DockView;
 
 typedef struct {
@@ -128,13 +137,16 @@ typedef struct {
     GAppInfoMonitor *app_monitor;
     guint animation_timer;
     int mouse_x, mouse_y, image_scale;
-    gint64 last_pointer_query, last_frame_time;
+    gint64 last_pointer_query;
     gboolean animation_fast;
     unsigned numlock_mask;
     int xi_opcode;
     KeyCode super_left, lock_keys[3];
     unsigned char raw_keys[32], raw_previous[XIMaskLen(XI_LASTEVENT)];
     gboolean raw_shortcuts;
+    Display *barrier_display;
+    int barrier_opcode;
+    guint barrier_source;
     SuperTap super_tap;
 } Launcher;
 
@@ -179,6 +191,11 @@ static void wake_animation(void);
 static void hide_icon_tooltip(DockView *view);
 static gboolean handle_key(XKeyEvent *event);
 static void handle_raw_shortcut(XEvent *event);
+static void configure_barrier(DockView *view);
+static void destroy_barrier(DockView *view);
+static void init_barriers(void);
+static gboolean decay_barrier_pressure(gpointer data);
+static gboolean barrier_events(gint fd, GIOCondition condition, gpointer data);
 
 static void dock_background_color(double color[3])
 {
@@ -1584,6 +1601,247 @@ static void schedule_refresh(void)
         dock.refresh_idle = g_idle_add(refresh_idle, NULL);
 }
 
+/* Unity's PointerBarrierWrapper and EdgeBarrierController, with the vertical
+ * barrier mirrored for this host's right-hand launcher option. A dedicated X
+ * connection negotiates XI 2.3 without changing GDK's XI version/event masks. */
+static float reveal_responsiveness(void)
+{
+    return .2 + 7.8 * dock.settings.reveal_sensitivity / 100;
+}
+
+typedef enum { BARRIER_HANDLED, BARRIER_RELEASE } BarrierResult;
+
+static BarrierResult barrier_reveal_pressure(DockView *view, int x, int y, int velocity,
+                                             gboolean first, unsigned buttons, gint64 now)
+{
+    float responsiveness = reveal_responsiveness();
+    launcher_reveal_configure(&view->hide, responsiveness);
+    view->overcome.decay_rate = view->hide.decay_rate;
+    view->overcome.reveal_pressure = 2000 * responsiveness;
+    hide_machine_tick(&view->hide, now);
+    hide_machine_tick(&view->overcome, now);
+    if (view->barrier_released_until > now || !dock.settings.autohide ||
+        (view->hide.quirks & LOCK_HIDE))
+        return BARRIER_RELEASE;
+    if (!view->hidden) {
+        /* ALREADY_HANDLED: let the user push through an interior monitor
+         * edge, using the same 20-pixel break zone and overcome pressure. */
+        if (!view->overcome.pressure)
+            view->break_y = y;
+        if (abs(y - view->break_y) <= 20)
+            hide_machine_pressure(&view->overcome, velocity, now);
+        else
+            view->overcome.pressure = 0;
+        return (view->overcome.quirks & REVEAL_PRESSURE_PASS) ? BARRIER_RELEASE : BARRIER_HANDLED;
+    }
+    int edge = view->geometry.x + (dock.settings.position == DOCK_RIGHT ? view->geometry.width : 0);
+    int logical_x = x / MAX(1, view->scale);
+    int logical_y = y / MAX(1, view->scale);
+    gboolean in_edge = dock.settings.position == DOCK_RIGHT
+                           ? logical_x >= edge - view->width && logical_x <= edge
+                           : logical_x >= edge && logical_x <= edge + view->width;
+    /* Launcher::HandleBarrierEvent ignores the panel above the launcher and
+     * releases on left/right-button drags instead of revealing over them. */
+    if (!in_edge || logical_y < view->top || (buttons & (Button1Mask | Button3Mask)))
+        return BARRIER_RELEASE;
+    if (!first)
+        hide_machine_pressure(&view->hide, velocity, now);
+    view->overcome.pressure = 0;
+    return BARRIER_HANDLED;
+}
+
+static void release_barrier(DockView *view, BarrierEventID event, gboolean once)
+{
+    XIBarrierReleasePointer(dock.barrier_display, view->barrier_device, view->barrier, event);
+    XFlush(dock.barrier_display);
+    gint64 now = g_get_monotonic_time() / 1000;
+    if (view->barrier_released_until <= now)
+        view->barrier_release_once = FALSE;
+    view->barrier_release_once |= once;
+    if (!view->barrier_release_once || view->barrier_released_until <= now)
+        view->barrier_released_until = now + 1000;
+    view->overcome.pressure = 0;
+    view->overcome.quirks = 0;
+}
+
+static void send_barrier_pressure(DockView *view, int x, int y, int velocity, BarrierEventID event,
+                                  gboolean first)
+{
+    Window root, child;
+    int root_x, root_y, win_x, win_y;
+    unsigned buttons = 0;
+    XQueryPointer(dock.barrier_display, DefaultRootWindow(dock.barrier_display), &root, &child,
+                  &root_x, &root_y, &win_x, &win_y, &buttons);
+    if (barrier_reveal_pressure(view, x, y, velocity, first, buttons,
+                                g_get_monotonic_time() / 1000) == BARRIER_RELEASE)
+        release_barrier(view, event, y / MAX(1, view->scale) < view->top);
+    if (!view->pressure_timer && (view->hide.pressure || view->overcome.pressure))
+        view->pressure_timer = g_timeout_add(10, decay_barrier_pressure, view);
+    wake_animation();
+}
+
+static gboolean emit_barrier_pressure(gpointer data)
+{
+    DockView *view = data;
+    view->smoothing_timer = 0;
+    if (view->smoothing_count > 0) {
+        int velocity = launcher_barrier_smoothed(view->smoothing_accum, view->smoothing_count,
+                                                 reveal_responsiveness());
+        send_barrier_pressure(view, view->smoothing_x, view->smoothing_y, velocity,
+                              view->smoothing_event, FALSE);
+        view->smoothing_accum = view->smoothing_count = 0;
+    }
+    /* XQueryPointer may have read more barrier events into Xlib's queue. */
+    barrier_events(-1, 0, NULL);
+    return G_SOURCE_REMOVE;
+}
+
+static gboolean decay_barrier_pressure(gpointer data)
+{
+    DockView *view = data;
+    gint64 now = g_get_monotonic_time() / 1000;
+    hide_machine_tick(&view->hide, now);
+    hide_machine_tick(&view->overcome, now);
+    if (!view->hide.pressure && !view->overcome.pressure) {
+        view->pressure_timer = 0;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+
+static void handle_barrier_hit(DockView *view, const XIBarrierEvent *event)
+{
+    int velocity = launcher_barrier_velocity(event->dx, event->dy, event->dtime);
+    view->smoothing_accum += velocity;
+    view->smoothing_count++;
+    view->barrier_device = event->deviceid;
+    if (velocity > 6500 || view->barrier_released_until > g_get_monotonic_time() / 1000) {
+        if (view->smoothing_timer) {
+            g_source_remove(view->smoothing_timer);
+            view->smoothing_timer = 0;
+        }
+        if (velocity > 6500) {
+            /* PointerBarrierWrapper bypasses the subscriber on fast crossings. */
+            XIBarrierReleasePointer(dock.barrier_display, event->deviceid, view->barrier,
+                                    event->eventid);
+            XFlush(dock.barrier_display);
+        } else
+            send_barrier_pressure(view, event->root_x, event->root_y, velocity, event->eventid,
+                                  FALSE);
+    } else if (!view->smoothing_timer) {
+        if (view->barrier_last_event != event->eventid) {
+            view->barrier_last_event = event->eventid;
+            send_barrier_pressure(view, event->root_x, event->root_y, velocity, event->eventid,
+                                  TRUE);
+        }
+        view->smoothing_x = event->root_x;
+        view->smoothing_y = event->root_y;
+        view->smoothing_event = event->eventid;
+        view->smoothing_timer = g_timeout_add(75, emit_barrier_pressure, view);
+    }
+}
+
+static gboolean barrier_events(gint fd, GIOCondition condition, gpointer data)
+{
+    (void)fd;
+    (void)data;
+    if (condition & (G_IO_HUP | G_IO_ERR)) {
+        dock.barrier_source = 0;
+        return G_SOURCE_REMOVE;
+    }
+    while (XPending(dock.barrier_display)) {
+        XEvent event;
+        XNextEvent(dock.barrier_display, &event);
+        if (event.type != GenericEvent || event.xcookie.extension != dock.barrier_opcode ||
+            !XGetEventData(dock.barrier_display, &event.xcookie))
+            continue;
+        if (event.xcookie.evtype == XI_BarrierHit) {
+            XIBarrierEvent *hit = event.xcookie.data;
+            for (guint i = 0; i < dock.views->len; i++) {
+                DockView *view = g_ptr_array_index(dock.views, i);
+                if (view->barrier == hit->barrier) {
+                    handle_barrier_hit(view, hit);
+                    break;
+                }
+            }
+        }
+        XFreeEventData(dock.barrier_display, &event.xcookie);
+    }
+    return G_SOURCE_CONTINUE;
+}
+
+static void init_barriers(void)
+{
+    dock.barrier_display = XOpenDisplay(gdk_display_get_name(dock.gdisplay));
+    if (!dock.barrier_display)
+        return;
+    int event, error, major = 2, minor = 3, fixes_major = 5, fixes_minor = 0;
+    if (!XQueryExtension(dock.barrier_display, "XInputExtension", &dock.barrier_opcode, &event,
+                         &error) ||
+        XIQueryVersion(dock.barrier_display, &major, &minor) != Success || major < 2 ||
+        (major == 2 && minor < 3) || !XFixesQueryExtension(dock.barrier_display, &event, &error) ||
+        !XFixesQueryVersion(dock.barrier_display, &fixes_major, &fixes_minor) || fixes_major < 5) {
+        g_printerr("Launcher edge reveal requires XInput 2.3 and XFixes 5.\n");
+        XCloseDisplay(dock.barrier_display);
+        dock.barrier_display = NULL;
+        return;
+    }
+    unsigned char events[XIMaskLen(XI_LASTEVENT)] = {0};
+    XISetMask(events, XI_BarrierHit);
+    XIEventMask mask = {XIAllMasterDevices, sizeof(events), events};
+    XISelectEvents(dock.barrier_display, DefaultRootWindow(dock.barrier_display), &mask, 1);
+    XFlush(dock.barrier_display);
+    dock.barrier_source = g_unix_fd_add(ConnectionNumber(dock.barrier_display),
+                                        G_IO_IN | G_IO_HUP | G_IO_ERR, barrier_events, NULL);
+}
+
+static void destroy_barrier(DockView *view)
+{
+    if (view->smoothing_timer)
+        g_source_remove(view->smoothing_timer);
+    if (view->pressure_timer)
+        g_source_remove(view->pressure_timer);
+    view->smoothing_timer = view->pressure_timer = 0;
+    view->smoothing_accum = view->smoothing_count = 0;
+    if (view->barrier) {
+        XFixesDestroyPointerBarrier(dock.barrier_display, view->barrier);
+        XFlush(dock.barrier_display);
+        view->barrier = 0;
+    }
+    view->barrier_last_event = 0;
+    view->barrier_released_until = 0;
+    view->barrier_release_once = FALSE;
+    hide_machine_init(&view->overcome);
+}
+
+static void configure_barrier(DockView *view)
+{
+    float responsiveness = reveal_responsiveness();
+    launcher_reveal_configure(&view->hide, responsiveness);
+    view->overcome.decay_rate = view->hide.decay_rate;
+    if (!dock.barrier_display)
+        return;
+    int scale = MAX(1, view->scale);
+    int x = (view->geometry.x + (dock.settings.position == DOCK_RIGHT ? view->geometry.width : 0)) *
+            scale;
+    int top = view->geometry.y * scale;
+    int bottom = (view->geometry.y + view->geometry.height) * scale;
+    if (view->barrier && dock.settings.autohide && x == view->barrier_x &&
+        top == view->barrier_top && bottom == view->barrier_bottom)
+        return;
+    destroy_barrier(view);
+    if (!dock.settings.autohide)
+        return;
+    view->barrier_x = x;
+    view->barrier_top = top;
+    view->barrier_bottom = bottom;
+    /* PointerBarrierWrapper defaults to BOTH for vertical launcher edges. */
+    view->barrier =
+        XFixesCreatePointerBarrier(dock.barrier_display, DefaultRootWindow(dock.barrier_display), x,
+                                   top, x, bottom, 0, 0, NULL);
+    XFlush(dock.barrier_display);
+}
+
 static GdkFilterReturn window_event_filter(GdkXEvent *raw, GdkEvent *event, gpointer data)
 {
     (void)event;
@@ -1638,6 +1896,7 @@ static void position(void)
     int height =
         MAX(1, MIN(dock.view->geometry.y + dock.view->geometry.height, work.y + work.height) - top);
     dock.view->height = height;
+    configure_barrier(dock.view);
     gboolean right = dock.settings.position == DOCK_RIGHT;
     int x = dock.view->geometry.x +
             (right ? dock.view->geometry.width - dock.view->width - BOUNCE_GUTTER : 0);
@@ -1985,6 +2244,7 @@ static void canvas_scale_changed(GtkWidget *area, GParamSpec *spec, gpointer dat
         g_warning("Cannot resize renderer: %s", error->message);
         g_clear_error(&error);
     }
+    configure_barrier(dock.view);
     queue_render(area);
 }
 
@@ -2629,22 +2889,12 @@ static void configure_shortcuts(gboolean enable)
 
 static gboolean animation_step(gint64 now, gboolean shared_redraw)
 {
-    GdkSeat *seat = gdk_display_get_default_seat(dock.gdisplay);
-    GdkDevice *pointer = gdk_seat_get_pointer(seat);
-    int x, y;
-    x = dock.mouse_x;
-    y = dock.mouse_y;
-    if (now - dock.last_pointer_query >= 100) {
-        gdk_device_get_position(pointer, NULL, &x, &y);
-        dock.last_pointer_query = now;
-    }
+    int x = dock.mouse_x, y = dock.mouse_y;
     gboolean on_monitor = y >= dock.view->top && y < dock.view->top + dock.view->height;
     gboolean right = dock.settings.position == DOCK_RIGHT;
     int edge = dock.view->geometry.x + (right ? dock.view->geometry.width : 0);
     gboolean mouse_over = on_monitor && x >= (right ? edge - dock.view->width : edge) &&
                           x < (right ? edge : edge + dock.view->width);
-    dock.view->hide.reveal_pressure =
-        MAX(100, (int)round(4000 - 40 * dock.settings.reveal_sensitivity));
     hide_machine_mode(&dock.view->hide, dock.settings.autohide ? AUTOHIDE : HIDE_NEVER, now);
     hide_machine_quirk(&dock.view->hide, MOUSE_OVER_LAUNCHER, mouse_over && !dock.view->hidden,
                        now);
@@ -2654,10 +2904,6 @@ static gboolean animation_step(gint64 now, gboolean shared_redraw)
                            (dock.settings_window && gtk_widget_get_visible(dock.settings_window)),
                        now);
     hide_machine_quirk(&dock.view->hide, KEY_NAV_ACTIVE, dock.view->keyboard_mode, now);
-    if (dock.view->hidden && on_monitor &&
-        (right ? (x >= edge - 2 && x < edge) : (x >= edge && x <= edge + 1)))
-        hide_machine_pressure(&dock.view->hide,
-                              (int)MIN(100, MAX(16, now - dock.last_frame_time)) * 6, now);
     hide_machine_tick(&dock.view->hide, now);
     gboolean redraw = shared_redraw;
     if (dock.view->hidden != dock.view->hide.should_hide) {
@@ -2801,6 +3047,12 @@ static gboolean animation_frame(gpointer data)
     GtkSettings *gtk_settings = gtk_settings_get_default();
     if (gtk_settings)
         g_object_get(gtk_settings, "gtk-enable-animations", &animations_enabled, NULL);
+    /* Query once per frame so all monitor views use the same coordinates. */
+    if (dock.last_pointer_query != now) {
+        GdkSeat *seat = gdk_display_get_default_seat(dock.gdisplay);
+        gdk_device_get_position(gdk_seat_get_pointer(seat), NULL, &dock.mouse_x, &dock.mouse_y);
+        dock.last_pointer_query = now;
+    }
     advance_shared_animations(now, animations_enabled, &shared_redraw, &active,
                               &attention_animating);
     for (guint i = 0; i < dock.views->len; i++) {
@@ -2808,7 +3060,6 @@ static gboolean animation_frame(gpointer data)
         active |= animation_step(now, shared_redraw);
     }
     dock.view = previous;
-    dock.last_frame_time = g_get_monotonic_time() / 1000;
     dock.animation_fast = active;
     dock.animation_timer =
         g_timeout_add(active || attention_animating ? 16 : 100, animation_frame, NULL);
@@ -2926,6 +3177,7 @@ static void destroy_view(gpointer data)
     DockView *previous = dock.view;
     dock.view = view;
     view->disposing = TRUE;
+    destroy_barrier(view);
     hide_icon_tooltip(view);
     if (view->tooltip_window) {
         gtk_widget_destroy(view->tooltip_window);
@@ -3343,6 +3595,7 @@ int main(int argc, char **argv)
     dock.applied_settings = dock.settings;
     dock.image_scale = preferred_image_scale();
     dock.views = g_ptr_array_new_with_free_func(destroy_view);
+    init_barriers();
     dock.items = g_ptr_array_new_with_free_func(item_free);
     dock.layout_scratch = g_array_sized_new(FALSE, FALSE, sizeof(LayoutIcon), 64);
     dock.watched_windows = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -3445,6 +3698,10 @@ int main(int argc, char **argv)
         save_config();
     }
     g_ptr_array_unref(dock.views);
+    if (dock.barrier_source)
+        g_source_remove(dock.barrier_source);
+    if (dock.barrier_display)
+        XCloseDisplay(dock.barrier_display);
     dock.views = NULL;
     dock.view = NULL;
     g_ptr_array_unref(dock.items);

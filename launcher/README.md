@@ -7,7 +7,7 @@ compositing. Native Wayland is unsupported.
 ## Build and install
 
 Requires a C11 compiler, Make, pkg-config, GLib's resource compiler, and development
-files for GTK 3/GIO, Xlib, XInput2 and XRender. No Unity services or OpenGL runtime required.
+files for GTK 3/GIO, Xlib, XInput2, XFixes and XRender. No Unity services or OpenGL runtime required.
 Commands below run from `launcher/`:
 
 ```sh
@@ -35,6 +35,12 @@ Right-click → **Settings…**. Changes apply immediately and persist.
 
 System icons stay at the bottom: Show Desktop above Trash. Each dock fills the
 monitor's available height around existing panels. All monitors share one process.
+Auto-hide reveal uses XInput 2.3/XFixes 5 pointer barriers, matching Unity's
+velocity-based pressure, 75 ms smoothing and gradual decay. Push against the
+edge to reveal; leaving the pointer stationary does not build pressure. The
+0–100 sensitivity slider maps to Unity's 0.2–8.0 responsiveness range (default
+2.0, about 23%). Fast crossings above 6500 px/s pass through interior edges.
+
 Interior monitor edges cannot reserve space through EWMH struts. Fullscreen
 windows can cover the dock. Use `--no-autohide` to keep it visible otherwise.
 
@@ -82,10 +88,13 @@ GTK's animation preference controls bouncing.
 make check                  # unit tests, CLI, desktop entry
 make check-renderer         # headless CPU renderer; images in build/cpu/
 make check-renderer-parity  # optional GL comparison; needs libepoxy and EGL
-make check-upstream        # snapshot hashes and original/C state comparison
+make check-upstream        # snapshot hashes and original/C state/reveal comparison
+LUNATIC_TEST_NESTED_DISPLAY=:98 make check-barriers  # disposable nested X server only
 make bake-assets           # regenerate bundled PNGs; needs rsvg-convert
 ```
 
+Barrier integration tests also need XTest development files and a disposable
+X server (for example Xephyr); they move only that display's pointer.
 Upstream checks also need Python 3 and a C++ compiler. Ordinary builds use bundled
 assets and download nothing. See the [source map](PORTING.md).
 
