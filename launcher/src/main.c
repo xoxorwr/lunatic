@@ -1210,9 +1210,9 @@ static gboolean record_window_presence(Item *item, gboolean visible)
         return FALSE;
     item->has_windows = TRUE;
     item->seen |= visible;
-    /* Pinned icons remain on every workspace, so retain their windows for
-     * running markers, quicklists and activation on every workspace too. */
-    return visible || item->pinned;
+    /* Keep application lifetime separate from the configured window filter.
+     * Pinning an icon must not bypass workspace filtering. */
+    return visible;
 }
 
 static void clear_closed_app_overlays(Item *item)
@@ -1246,7 +1246,10 @@ static void refresh(void)
     Window *windows = (Window *)property(dock.root, "_NET_CLIENT_LIST", XA_WINDOW, 32, &count);
     for (unsigned long i = 0; i < count; i++) {
         Window window = windows[i];
-        if (gdk_x11_window_lookup_for_display(dock.gdisplay, window))
+        GdkWindow *known = gdk_x11_window_lookup_for_display(dock.gdisplay, window);
+        /* GDK can cache wrappers for other applications' X11 windows. Only
+         * skip our own windows, not clients represented by foreign wrappers. */
+        if (known && gdk_window_get_window_type(known) != GDK_WINDOW_FOREIGN)
             continue;
         if (has_atom(window, "_NET_WM_STATE", "_NET_WM_STATE_SKIP_TASKBAR") ||
             has_atom(window, "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_DOCK") ||

@@ -114,30 +114,37 @@ static void pinned_workspace_tracking(void)
     item->pinned = TRUE;
     g_assert_false(dock.settings.all_workspaces);
 
-    /* Repeat the actual refresh/filter/activation selection when switching
-     * away from Chrome's workspace and back. Its pinned icon never stops
-     * representing the existing window, even with workspace filtering on. */
+    /* Pinned icons obey the same window filter as unpinned ones. Switching
+     * back restores the existing window; switching away hides its marker
+     * and excludes it from the quicklist and activation selection. */
     const unsigned long workspaces[] = {0, 1, 2, 0};
     for (guint i = 0; i < G_N_ELEMENTS(workspaces); i++) {
         dock.current_desktop = workspaces[i];
         begin_window_refresh(item);
         gboolean visible = launcher_settings_window_visible(
             &dock.settings, 0, dock.current_desktop);
-        g_assert_true(record_window_presence(item, visible));
-        Client *client = g_new0(Client, 1);
-        client->xid = 123;
-        client->desktop = 0;
-        g_ptr_array_add(item->clients, client);
+        g_assert_cmpint(record_window_presence(item, visible), ==, visible);
+        Client *client = NULL;
+        if (visible) {
+            client = g_new0(Client, 1);
+            client->xid = 123;
+            client->desktop = 0;
+            g_ptr_array_add(item->clients, client);
+        }
         g_assert_true(item->has_windows);
         g_assert_cmpint(item->seen, ==, visible);
         g_assert_true(item_activation_client(item, dock.current_desktop) == client);
         RenderArg arg = item_render_arg(item, 1, 1000);
-        g_assert_cmpuint(arg.running, ==, 1);
+        g_assert_cmpuint(arg.running, ==, visible ? 1 : 0);
         g_assert_cmpint(arg.running_here, ==, visible);
     }
 
-    /* Prefer a window on the current workspace when both exist. */
+    /* Enabling all workspaces permits remote windows, while activation
+     * still prefers a window on the current workspace. */
+    dock.settings.all_workspaces = TRUE;
     dock.current_desktop = 0;
+    g_assert_true(record_window_presence(item, launcher_settings_window_visible(
+        &dock.settings, 1, dock.current_desktop)));
     Client *remote = g_new0(Client, 1);
     remote->xid = 456;
     remote->desktop = 1;
