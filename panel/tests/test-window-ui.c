@@ -197,11 +197,123 @@ static void hover_controls(void)
     panel_wm_theme_unref(state.wm_theme);
 }
 
+static void realize_menu_tree(GtkWidget *widget, gpointer data)
+{
+    (void)data;
+    gtk_widget_realize(widget);
+    if (GTK_IS_CONTAINER(widget))
+        gtk_container_forall(GTK_CONTAINER(widget), realize_menu_tree, NULL);
+}
+
+static void assert_menu_columns(GtkWidget *menu)
+{
+    gtk_widget_show(menu);
+    realize_menu_tree(menu, NULL);
+    gtk_widget_queue_resize(menu);
+    GtkRequisition minimum, natural;
+    gtk_widget_get_preferred_size(menu, &minimum, &natural);
+    GtkAllocation allocation = {0, 0, MAX(400, natural.width), natural.height};
+    gtk_widget_size_allocate(menu, &allocation);
+    gint column = -1, icon_column = -1;
+    GList *rows = gtk_container_get_children(GTK_CONTAINER(menu));
+    for (GList *it = rows; it; it = it->next) {
+        GtkWidget *row = it->data;
+        if (GTK_IS_SEPARATOR_MENU_ITEM(row)) continue;
+        GtkWidget *box = gtk_bin_get_child(GTK_BIN(row));
+        g_assert_true(GTK_IS_BOX(box));
+        GList *children = gtk_container_get_children(GTK_CONTAINER(box));
+        GtkWidget *image = NULL, *label = NULL;
+        for (GList *child = children; child; child = child->next) {
+            if (GTK_IS_IMAGE(child->data)) image = child->data;
+            if (GTK_IS_LABEL(child->data)) label = child->data;
+        }
+        g_list_free(children);
+        g_assert_nonnull(image);
+        g_assert_nonnull(label);
+        gtk_widget_realize(label);
+        gtk_widget_realize(image);
+        gint x, y;
+        g_assert_true(gtk_widget_translate_coordinates(label, menu, 0, 0, &x, &y));
+        if (column == -1) column = x;
+        g_assert_cmpint(x, ==, column);
+        g_assert_true(gtk_widget_translate_coordinates(image, menu, 0, 0, &x, &y));
+        if (icon_column == -1) icon_column = x;
+        g_assert_cmpint(x, ==, icon_column);
+    }
+    g_list_free(rows);
+    g_assert_cmpint(column, >=, icon_column + 16);
+}
+
+static void menu_columns(void)
+{
+    GMenu *root = g_menu_new(), *model = g_menu_new(), *nested = g_menu_new();
+    g_menu_append_submenu(root, "File", G_MENU_MODEL(model));
+    GMenuItem *item = g_menu_item_new("Open", "app.open");
+    GIcon *icon = g_themed_icon_new("document-open");
+    g_menu_item_set_icon(item, icon);
+    g_menu_append_item(model, item);
+    g_object_unref(item);
+    g_menu_append(model, "Without icon", "app.open");
+    g_menu_append(nested, "Nested without icon", "app.open");
+    g_menu_append_submenu(model, "Nested", G_MENU_MODEL(nested));
+    GSimpleActionGroup *actions = g_simple_action_group_new();
+    GSimpleAction *open = g_simple_action_new("open", NULL);
+    g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(open));
+    g_object_unref(open);
+    GtkWidget *bar = g_object_ref_sink(gtk_menu_bar_new());
+    gtk_widget_insert_action_group(bar, "app", G_ACTION_GROUP(actions));
+    gtk_menu_shell_bind_model(GTK_MENU_SHELL(bar), G_MENU_MODEL(root), NULL, FALSE);
+    panel_menu_bar_align_items(bar);
+    GList *top = gtk_container_get_children(GTK_CONTAINER(bar));
+    GtkWidget *menu = gtk_menu_item_get_submenu(GTK_MENU_ITEM(top->data));
+    /* Top-level panel labels should not gain an empty image column. */
+    g_assert_true(GTK_IS_LABEL(gtk_bin_get_child(GTK_BIN(top->data))));
+    g_list_free(top);
+    g_assert_false(gtk_menu_get_reserve_toggle_size(GTK_MENU(menu)));
+    assert_menu_columns(menu);
+
+    /* Late rows and replacement icons must inherit the same layout. */
+    item = g_menu_item_new("Late icon", "app.open");
+    g_menu_item_set_icon(item, icon);
+    g_menu_append_item(model, item);
+    g_object_unref(item);
+    g_menu_append(model, "Late plain", "app.open");
+    assert_menu_columns(menu);
+    GList *rows = gtk_container_get_children(GTK_CONTAINER(menu));
+    GtkWidget *first = rows->data;
+    g_object_set(first, "icon", NULL, NULL);
+    assert_menu_columns(menu);
+    g_object_set(first, "icon", icon, NULL);
+    assert_menu_columns(menu);
+    GtkWidget *sub = gtk_menu_item_get_submenu(GTK_MENU_ITEM(g_list_nth_data(rows, 2)));
+    assert_menu_columns(sub);
+    g_list_free(rows);
+
+    GSimpleAction *check = g_simple_action_new_stateful("check", NULL, g_variant_new_boolean(TRUE));
+    g_action_map_add_action(G_ACTION_MAP(actions), G_ACTION(check));
+    g_object_unref(check);
+    g_menu_append(model, "Checked item", "app.check");
+    g_assert_true(gtk_menu_get_reserve_toggle_size(GTK_MENU(menu)));
+    assert_menu_columns(menu);
+    g_menu_remove(model, 5);
+    g_assert_false(gtk_menu_get_reserve_toggle_size(GTK_MENU(menu)));
+    assert_menu_columns(menu);
+
+    gtk_widget_destroy(bar);
+    g_object_unref(bar);
+    g_object_unref(actions);
+    g_object_unref(icon);
+    g_object_unref(nested);
+    g_object_unref(model);
+    g_object_unref(root);
+}
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
     if (!gtk_init_check(&argc, &argv)) { g_print("SKIP: window UI test needs a display\n"); return 77; }
     g_test_add_func("/panel/window-controls-hover", hover_controls);
     g_test_add_func("/panel/menu-alt-mnemonics", menu_mnemonics);
+    g_test_add_func("/panel/menu-columns", menu_columns);
     return g_test_run();
 }

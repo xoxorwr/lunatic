@@ -139,6 +139,181 @@ static GtkWidget *first_child(GtkWidget *menu)
     g_list_free(children);
     return child;
 }
+
+static GIcon *find_icon(GMenuModel *model)
+{
+    for (int i = 0; i < g_menu_model_get_n_items(model); i++) {
+        GVariant *value = g_menu_model_get_item_attribute_value(model, i, G_MENU_ATTRIBUTE_ICON, NULL);
+        if (value) {
+            GIcon *icon = g_icon_deserialize(value);
+            g_variant_unref(value);
+            return icon;
+        }
+        GMenuModel *section = g_menu_model_get_item_link(model, i, G_MENU_LINK_SECTION);
+        if (section) {
+            GIcon *icon = find_icon(section);
+            g_object_unref(section);
+            if (icon) return icon;
+        }
+    }
+    return NULL;
+}
+
+static void find_display_image(GtkWidget *widget, gpointer data)
+{
+    GtkWidget **image = data;
+    if (GTK_IS_IMAGE(widget)) *image = widget;
+    else if (GTK_IS_CONTAINER(widget))
+        gtk_container_forall(GTK_CONTAINER(widget), find_display_image, data);
+}
+
+static void menu_icons(void)
+{
+    GtkWidget *bar = g_object_ref_sink(gtk_menu_bar_new());
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+    GtkWidget *item = gtk_image_menu_item_new_with_label("Open");
+    GtkWidget *image = gtk_image_new_from_icon_name("document-open", GTK_ICON_SIZE_MENU);
+    gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), image);
+    G_GNUC_END_IGNORE_DEPRECATIONS
+    gtk_menu_shell_append(GTK_MENU_SHELL(bar), item);
+    gtk_widget_show(item);
+    /* Source images can be hidden by GTK's legacy menu-image preference. */
+    gtk_widget_hide(image);
+    PanelGtkMenuExport *exporter = panel_gtk_menu_export_new(GTK_MENU_BAR(bar));
+    GMenuModel *model = panel_gtk_menu_export_model(exporter);
+    GIcon *expected = g_themed_icon_new("document-open");
+    GIcon *icon = find_icon(model);
+    g_assert_nonnull(icon);
+    g_assert_true(g_icon_equal(icon, expected));
+    g_object_unref(icon);
+    g_object_unref(expected);
+
+    GtkWidget *view = g_object_ref_sink(gtk_menu_new());
+    gtk_widget_insert_action_group(view, "app", panel_gtk_menu_export_actions(exporter));
+    gtk_menu_shell_bind_model(GTK_MENU_SHELL(view), model, NULL, FALSE);
+    GtkWidget *display_image = NULL;
+    find_display_image(view, &display_image);
+    g_assert_nonnull(display_image);
+    g_assert_true(gtk_widget_get_visible(display_image));
+
+    /* Changes must propagate without explicitly rebuilding the export. */
+    expected = g_themed_icon_new("document-save");
+    gtk_image_set_from_gicon(GTK_IMAGE(image), expected, GTK_ICON_SIZE_MENU);
+    while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE);
+    icon = find_icon(model);
+    g_assert_nonnull(icon);
+    g_assert_true(g_icon_equal(icon, expected));
+    g_object_unref(icon);
+    g_object_unref(expected);
+
+    GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8, 16, 16);
+    gdk_pixbuf_fill(pixbuf, 0x123456ff);
+    gtk_image_set_from_pixbuf(GTK_IMAGE(image), pixbuf);
+    g_object_unref(pixbuf);
+    while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE);
+    icon = find_icon(model);
+    g_assert_true(G_IS_BYTES_ICON(icon));
+    GBytes *bytes = g_bytes_icon_get_bytes(G_BYTES_ICON(icon));
+    GInputStream *stream = g_memory_input_stream_new_from_bytes(bytes);
+    pixbuf = gdk_pixbuf_new_from_stream(stream, NULL, NULL);
+    g_assert_nonnull(pixbuf);
+    g_assert_cmpuint(gdk_pixbuf_get_pixels(pixbuf)[0], ==, 0x12);
+    g_object_unref(pixbuf);
+    g_object_unref(stream);
+    g_object_unref(icon);
+
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 16, 16);
+    cairo_t *cr = cairo_create(surface);
+    cairo_set_source_rgba(cr, 0.2, 0.4, 0.6, 1);
+    cairo_paint(cr);
+    cairo_destroy(cr);
+    gtk_image_set_from_surface(GTK_IMAGE(image), surface);
+    cairo_surface_destroy(surface);
+    while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE);
+    icon = find_icon(model);
+    g_assert_true(G_IS_BYTES_ICON(icon));
+    g_object_unref(icon);
+
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+    gtk_image_set_from_stock(GTK_IMAGE(image), GTK_STOCK_OPEN, GTK_ICON_SIZE_MENU);
+    G_GNUC_END_IGNORE_DEPRECATIONS
+    while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE);
+    icon = find_icon(model);
+    g_assert_true(G_IS_BYTES_ICON(icon));
+    g_object_unref(icon);
+
+    gtk_image_clear(GTK_IMAGE(image));
+    while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE);
+    g_assert_null(find_icon(model));
+    gtk_widget_destroy(view);
+    g_object_unref(view);
+    panel_gtk_menu_export_free(exporter);
+    gtk_widget_destroy(bar);
+    g_object_unref(bar);
+}
+
+static void menu_shortcuts(void)
+{
+    GtkWidget *bar = g_object_ref_sink(gtk_menu_bar_new());
+    GtkWidget *item = gtk_menu_item_new_with_label("New Tab");
+    gtk_menu_shell_append(GTK_MENU_SHELL(bar), item);
+    gtk_widget_show(item);
+    GtkWidget *label = gtk_bin_get_child(GTK_BIN(item));
+    /* libxfce4ui sets this directly; it deliberately leaves accel-path unset. */
+    gtk_accel_label_set_accel(GTK_ACCEL_LABEL(label), GDK_KEY_t, GDK_CONTROL_MASK);
+    g_assert_null(gtk_menu_item_get_accel_path(GTK_MENU_ITEM(item)));
+    PanelGtkMenuExport *exporter = panel_gtk_menu_export_new(GTK_MENU_BAR(bar));
+    GMenuModel *model = panel_gtk_menu_export_model(exporter);
+    char *accel = find_attribute(model, "New Tab", "accel");
+    g_assert_nonnull(accel);
+    guint key;
+    GdkModifierType mods;
+    gtk_accelerator_parse(accel, &key, &mods);
+    g_assert_cmpuint(key, ==, GDK_KEY_t);
+    g_assert_cmpuint(mods, ==, GDK_CONTROL_MASK);
+    g_free(accel);
+
+    GtkWidget *view = g_object_ref_sink(gtk_menu_new());
+    gtk_widget_insert_action_group(view, "app", panel_gtk_menu_export_actions(exporter));
+    gtk_menu_shell_bind_model(GTK_MENU_SHELL(view), model, NULL, FALSE);
+    GtkWidget *display_label = gtk_bin_get_child(GTK_BIN(first_child(view)));
+    g_assert_true(GTK_IS_ACCEL_LABEL(display_label));
+    gtk_accel_label_get_accel(GTK_ACCEL_LABEL(display_label), &key, &mods);
+    g_assert_cmpuint(key, ==, GDK_KEY_t);
+    g_assert_cmpuint(mods, ==, GDK_CONTROL_MASK);
+    GtkRequisition minimum, natural;
+    gtk_accel_label_refetch(GTK_ACCEL_LABEL(display_label));
+    gtk_widget_get_preferred_size(display_label, &minimum, &natural);
+    g_assert_cmpuint(gtk_accel_label_get_accel_width(GTK_ACCEL_LABEL(display_label)), >, 0);
+
+    /* Traditional item paths and signal-connected accelerators still work. */
+    gtk_accel_label_set_accel(GTK_ACCEL_LABEL(label), 0, 0);
+    GtkAccelGroup *group = gtk_accel_group_new();
+    gtk_menu_set_accel_group(GTK_MENU(view), group);
+    gtk_accel_map_add_entry("<LunaticTest>/new-tab", GDK_KEY_n, GDK_CONTROL_MASK);
+    gtk_menu_item_set_accel_path(GTK_MENU_ITEM(item), "<LunaticTest>/new-tab");
+    panel_gtk_menu_export_rebuild(exporter);
+    accel = find_attribute(model, "New Tab", "accel");
+    g_assert_nonnull(accel);
+    gtk_accelerator_parse(accel, &key, &mods);
+    g_assert_cmpuint(key, ==, GDK_KEY_n);
+    g_free(accel);
+    gtk_menu_item_set_accel_path(GTK_MENU_ITEM(item), NULL);
+    gtk_widget_add_accelerator(item, "activate", group, GDK_KEY_w, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+    panel_gtk_menu_export_rebuild(exporter);
+    accel = find_attribute(model, "New Tab", "accel");
+    g_assert_nonnull(accel);
+    gtk_accelerator_parse(accel, &key, &mods);
+    g_assert_cmpuint(key, ==, GDK_KEY_w);
+    g_free(accel);
+
+    gtk_widget_destroy(view);
+    g_object_unref(view);
+    panel_gtk_menu_export_free(exporter);
+    gtk_widget_destroy(bar);
+    g_object_unref(bar);
+    g_object_unref(group);
+}
 static void cold_submenus(void)
 {
     ColdMenu cold = {0};
@@ -236,6 +411,8 @@ int main(int argc, char **argv)
     if (!gtk_init_check(&argc, &argv)) { g_print("SKIP: GTK exporter needs a display\n"); return 77; }
     g_test_add_func("/menu/gtk-export", bridge);
     g_test_add_func("/menu/cold-submenus", cold_submenus);
+    g_test_add_func("/menu/icons", menu_icons);
+    g_test_add_func("/menu/shortcuts", menu_shortcuts);
     g_test_add_func("/panel/title-width", title_width);
     return g_test_run();
 }

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "dbus-menu.h"
 #include "remote-menu.h"
+#include "menu-view.h"
 #define INTERFACE "com.canonical.dbusmenu"
 
 typedef struct {
@@ -124,6 +125,7 @@ GtkWidget *panel_dbus_menu_bar_new(GDBusConnection *bus, const char *service, co
     GtkWidget *menu = gtk_menu_bar_new();
     gtk_widget_insert_action_group(menu, "remote", panel_remote_menu_actions(client->model));
     gtk_menu_shell_bind_model(GTK_MENU_SHELL(menu), panel_remote_menu_model(client->model), NULL, FALSE);
+    panel_menu_bar_align_items(menu);
     g_signal_connect(menu, "destroy", G_CALLBACK(destroy), client);
     g_signal_connect(menu, "show", G_CALLBACK(show), client);
     client->subscription = g_dbus_connection_signal_subscribe(bus, service, INTERFACE, NULL,

@@ -159,9 +159,9 @@ static void shell_free(gpointer data)
 
 static void item_notify(GObject *object, GParamSpec *spec, gpointer data)
 {
-    (void)object;
+    if (GTK_IS_IMAGE(object)) { changed(data); return; }
     static const char *const properties[] = {"label", "use-underline", "sensitive", "visible",
-                                            "active", "inconsistent", "submenu"};
+                                            "active", "inconsistent", "submenu", "image"};
     for (guint i = 0; i < G_N_ELEMENTS(properties); i++)
         if (g_str_equal(spec->name, properties[i])) { changed(data); break; }
 }
@@ -192,7 +192,117 @@ static void watch(PanelGtkMenuExport *exporter, GtkWidget *widget)
         g_signal_connect(widget, "insert", G_CALLBACK(child_inserted), exporter);
         g_signal_connect(widget, "remove", G_CALLBACK(child_changed), exporter);
     }
-    if (GTK_IS_MENU_ITEM(widget)) g_signal_connect(widget, "notify", G_CALLBACK(item_notify), exporter);
+    if (GTK_IS_MENU_ITEM(widget) || GTK_IS_IMAGE(widget))
+        g_signal_connect(widget, "notify", G_CALLBACK(item_notify), exporter);
+}
+
+static void find_image(GtkWidget *widget, gpointer data)
+{
+    GtkWidget **image = data;
+    if (*image) return;
+    if (GTK_IS_IMAGE(widget)) *image = widget;
+    else if (GTK_IS_CONTAINER(widget) && !GTK_IS_MENU_SHELL(widget))
+        /* Include GtkImageMenuItem's internal image, even when GTK hides it. */
+        gtk_container_forall(GTK_CONTAINER(widget), find_image, data);
+}
+
+static void copy_icon(PanelGtkMenuExport *exporter, GtkWidget *widget, GMenuItem *item)
+{
+    GtkWidget *image = NULL;
+    find_image(widget, &image);
+    if (!image) return;
+    watch(exporter, image);
+    GIcon *icon = NULL;
+    GdkPixbuf *pixbuf = NULL;
+    switch (gtk_image_get_storage_type(GTK_IMAGE(image))) {
+    case GTK_IMAGE_ICON_NAME: {
+        const char *name = NULL;
+        gtk_image_get_icon_name(GTK_IMAGE(image), &name, NULL);
+        if (name && *name) icon = g_themed_icon_new(name);
+        break;
+    }
+    case GTK_IMAGE_GICON:
+        gtk_image_get_gicon(GTK_IMAGE(image), &icon, NULL);
+        if (icon) g_object_ref(icon);
+        break;
+    case GTK_IMAGE_PIXBUF:
+        pixbuf = gtk_image_get_pixbuf(GTK_IMAGE(image));
+        if (pixbuf) g_object_ref(pixbuf);
+        break;
+    case GTK_IMAGE_SURFACE: {
+        cairo_surface_t *surface = NULL;
+        g_object_get(image, "surface", &surface, NULL);
+        if (surface && cairo_surface_get_type(surface) == CAIRO_SURFACE_TYPE_IMAGE)
+            pixbuf = gdk_pixbuf_get_from_surface(surface, 0, 0,
+                cairo_image_surface_get_width(surface), cairo_image_surface_get_height(surface));
+        if (surface) cairo_surface_destroy(surface);
+        break;
+    }
+    case GTK_IMAGE_STOCK: {
+        G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+        char *stock = NULL;
+        GtkIconSize size;
+        gtk_image_get_stock(GTK_IMAGE(image), &stock, &size);
+        if (stock) pixbuf = gtk_widget_render_icon_pixbuf(image, stock, size);
+        G_GNUC_END_IGNORE_DEPRECATIONS
+        break;
+    }
+    default:
+        break;
+    }
+    if (pixbuf) {
+        char *buffer = NULL;
+        gsize length = 0;
+        if (gdk_pixbuf_save_to_buffer(pixbuf, &buffer, &length, "png", NULL, NULL)) {
+            GBytes *bytes = g_bytes_new_take(buffer, length);
+            icon = g_bytes_icon_new(bytes);
+            g_bytes_unref(bytes);
+        }
+        g_object_unref(pixbuf);
+    }
+    if (icon) {
+        g_menu_item_set_icon(item, icon);
+        g_object_unref(icon);
+    }
+}
+
+static void find_accel_label(GtkWidget *widget, gpointer data)
+{
+    GtkWidget **label = data;
+    if (*label) return;
+    if (GTK_IS_ACCEL_LABEL(widget)) *label = widget;
+    else if (GTK_IS_CONTAINER(widget) && !GTK_IS_MENU_SHELL(widget))
+        gtk_container_forall(GTK_CONTAINER(widget), find_accel_label, data);
+}
+
+static gboolean same_closure(GtkAccelKey *key, GClosure *closure, gpointer data)
+{
+    return closure == data && key->accel_key && (key->accel_flags & GTK_ACCEL_VISIBLE);
+}
+
+static void copy_accel(GtkWidget *widget, GMenuItem *item)
+{
+    GtkAccelKey key = {0};
+    GtkWidget *label = NULL;
+    find_accel_label(widget, &label);
+    /* Xfce explicitly sets the label's accelerator without an item accel path. */
+    if (label) gtk_accel_label_get_accel(GTK_ACCEL_LABEL(label), &key.accel_key, &key.accel_mods);
+    const char *path = gtk_menu_item_get_accel_path(GTK_MENU_ITEM(widget));
+    if (!key.accel_key && path) gtk_accel_map_lookup_entry(path, &key);
+    if (!key.accel_key) {
+        GList *closures = gtk_widget_list_accel_closures(widget);
+        for (GList *it = closures; it && !key.accel_key; it = it->next) {
+            GtkAccelGroup *group = gtk_accel_group_from_accel_closure(it->data);
+            GtkAccelKey *found = group ? gtk_accel_group_find(group, same_closure, it->data) : NULL;
+            if (found) key = *found;
+        }
+        g_list_free(closures);
+    }
+    if (key.accel_key) {
+        char *accel = gtk_accelerator_name(key.accel_key, key.accel_mods);
+        g_menu_item_set_attribute(item, "accel", "s", accel);
+        g_free(accel);
+    }
 }
 
 static Shell *build_shell(PanelGtkMenuExport *exporter, GtkWidget *widget, guint depth)
@@ -245,6 +355,7 @@ static Shell *build_shell(PanelGtkMenuExport *exporter, GtkWidget *widget, guint
             label = escaped;
         }
         GMenuItem *item = g_menu_item_new(label ? label : "", NULL);
+        copy_icon(exporter, child, item);
         GtkWidget *submenu = gtk_menu_item_get_submenu(GTK_MENU_ITEM(child));
         char *action = ensure_action(exporter, child, submenu != NULL);
         if (submenu && GTK_IS_MENU_SHELL(submenu)) {
@@ -261,13 +372,7 @@ static Shell *build_shell(PanelGtkMenuExport *exporter, GtkWidget *widget, guint
             g_menu_item_set_action_and_target_value(item, action,
                 GTK_IS_RADIO_MENU_ITEM(child) ? g_variant_new_string(item_id(child)) : NULL);
         }
-        const char *accel_path = gtk_menu_item_get_accel_path(GTK_MENU_ITEM(child));
-        GtkAccelKey key;
-        if (accel_path && gtk_accel_map_lookup_entry(accel_path, &key) && key.accel_key) {
-            char *accel = gtk_accelerator_name(key.accel_key, key.accel_mods);
-            g_menu_item_set_attribute(item, "accel", "s", accel);
-            g_free(accel);
-        }
+        copy_accel(child, item);
         panel_menu_builder_append(&builder, item);
         g_object_unref(item);
         g_free(action);
