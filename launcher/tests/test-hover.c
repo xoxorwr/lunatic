@@ -101,6 +101,8 @@ static void hover_window_list(void)
         Window second = ((Client *)g_ptr_array_index(item->clients, 1))->xid;
         GtkWidget *button = find_window_button(view.window_list, second);
         g_assert_nonnull(button);
+        g_assert_cmpstr(gtk_widget_get_tooltip_text(button), ==, "Window 2");
+        g_assert_cmpint(gtk_widget_get_allocated_height(button), <=, 32);
         g_assert_true(
             gtk_style_context_has_class(gtk_widget_get_style_context(button), "active-window"));
         gtk_button_clicked(GTK_BUTTON(button));

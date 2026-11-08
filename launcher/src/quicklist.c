@@ -16,7 +16,8 @@ static void rounded_rect(cairo_t *cr, double x, double y, double w, double h, do
 
 double quicklist_arrow_y(double icon_y, double menu_y, double height)
 {
-    return CLAMP(icon_y - menu_y, 24, MAX(24, height - 24));
+    double inset = MIN(24, height / 2);
+    return CLAMP(icon_y - menu_y, inset, MAX(inset, height - inset));
 }
 
 void quicklist_paint_frame(cairo_t *cr, double width, double height, gboolean pointer_left,
@@ -24,25 +25,28 @@ void quicklist_paint_frame(cairo_t *cr, double width, double height, gboolean po
 {
     double left = QUICKLIST_MARGIN + (pointer_left ? QUICKLIST_POINTER : 0);
     double right = width - QUICKLIST_MARGIN - (pointer_left ? 0 : QUICKLIST_POINTER);
-    double top = QUICKLIST_MARGIN, bottom = height - QUICKLIST_MARGIN, radius = 9;
-    double tip = quicklist_arrow_y(arrow_y, 0, height);
+    double top = QUICKLIST_MARGIN, bottom = height - QUICKLIST_MARGIN;
+    double radius = MIN(9, MAX(3, (bottom - top) / 5));
+    double arrow_half = MIN(10, MAX(1, (bottom - top - 2 * radius) / 2));
+    double tip = CLAMP(quicklist_arrow_y(arrow_y, 0, height), top + radius + arrow_half,
+                       bottom - radius - arrow_half);
     cairo_save(cr);
     cairo_move_to(cr, left + radius, top);
     cairo_line_to(cr, right - radius, top);
     cairo_arc(cr, right - radius, top + radius, radius, -G_PI / 2, 0);
     if (!pointer_left) {
-        cairo_line_to(cr, right, tip - 10);
+        cairo_line_to(cr, right, tip - arrow_half);
         cairo_line_to(cr, width - QUICKLIST_MARGIN, tip);
-        cairo_line_to(cr, right, tip + 10);
+        cairo_line_to(cr, right, tip + arrow_half);
     }
     cairo_line_to(cr, right, bottom - radius);
     cairo_arc(cr, right - radius, bottom - radius, radius, 0, G_PI / 2);
     cairo_line_to(cr, left + radius, bottom);
     cairo_arc(cr, left + radius, bottom - radius, radius, G_PI / 2, G_PI);
     if (pointer_left) {
-        cairo_line_to(cr, left, tip + 10);
+        cairo_line_to(cr, left, tip + arrow_half);
         cairo_line_to(cr, QUICKLIST_MARGIN, tip);
-        cairo_line_to(cr, left, tip - 10);
+        cairo_line_to(cr, left, tip - arrow_half);
     }
     cairo_line_to(cr, left, top + radius);
     cairo_arc(cr, left + radius, top + radius, radius, G_PI, 3 * G_PI / 2);
@@ -50,13 +54,11 @@ void quicklist_paint_frame(cairo_t *cr, double width, double height, gboolean po
     cairo_set_source_rgba(cr, 0, 0, 0, .18);
     cairo_set_line_width(cr, 6);
     cairo_stroke_preserve(cr);
-    cairo_pattern_t *fill = cairo_pattern_create_linear(0, top, 0, bottom);
-    cairo_pattern_add_color_stop_rgba(fill, 0, .18, .15, .25, .99);
-    cairo_pattern_add_color_stop_rgba(fill, 1, .10, .09, .15, .99);
-    cairo_set_source(cr, fill);
+    /* Ambiance gtk-3.20/gtk-main.css: dark_bg_color #3c3b37.
+     * gtk-widgets.css uses shade(dark_bg_color, 1.08) for native menus. */
+    cairo_set_source_rgb(cr, 65 / 255.0, 64 / 255.0, 59 / 255.0);
     cairo_fill_preserve(cr);
-    cairo_pattern_destroy(fill);
-    cairo_set_source_rgba(cr, .76, .62, .94, .62);
+    cairo_set_source_rgb(cr, 48 / 255.0, 47 / 255.0, 44 / 255.0);
     cairo_set_line_width(cr, 1);
     cairo_stroke(cr);
     cairo_restore(cr);
@@ -69,17 +71,16 @@ void quicklist_paint_row(cairo_t *cr, double width, double height, gboolean acti
         return;
     cairo_save(cr);
     rounded_rect(cr, 3, 1, MAX(1, width - 6), MAX(1, height - 2), 3);
-    if (active)
-        cairo_set_source_rgba(cr, .46, .32, .22, hovered ? .95 : .70);
+    /* Ambiance selected_bg_color, with a quiet persistent active marker. */
+    if (hovered)
+        cairo_set_source_rgb(cr, 240 / 255.0, 119 / 255.0, 70 / 255.0);
     else
-        cairo_set_source_rgba(cr, .57, .30, .76, .40);
+        cairo_set_source_rgba(cr, 1, 1, 1, .035);
     cairo_fill_preserve(cr);
     if (active) {
-        cairo_set_source_rgba(cr, 1, .66, .32, .30);
-        cairo_set_line_width(cr, 1);
-        cairo_stroke(cr);
+        cairo_new_path(cr);
         rounded_rect(cr, 6, 5, 3, MAX(3, height - 10), 1.5);
-        cairo_set_source_rgb(cr, 1, .53, .20);
+        cairo_set_source_rgba(cr, 240 / 255.0, 119 / 255.0, 70 / 255.0, .85);
         cairo_fill(cr);
     } else {
         cairo_new_path(cr);

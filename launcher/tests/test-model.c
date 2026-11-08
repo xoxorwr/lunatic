@@ -700,6 +700,8 @@ static void quicklist_decoration(void)
     g_assert_cmpfloat(quicklist_arrow_y(160, 100, 300), ==, 60);
     g_assert_cmpfloat(quicklist_arrow_y(110, 100, 300), ==, 24);
     g_assert_cmpfloat(quicklist_arrow_y(500, 100, 300), ==, 276);
+    g_assert_cmpfloat(quicklist_arrow_y(15, 0, 30), ==, 15);
+    g_assert_cmpfloat(quicklist_arrow_y(-200, 0, 30), ==, 15);
     g_assert_cmpint(g_mkdir_with_parents("build/host", 0700), ==, 0);
     for (int left = 0; left < 2; left++) {
         cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 300, 364);
@@ -743,11 +745,15 @@ static void quicklist_decoration(void)
         const char *commands[] = {"Unpin from launcher", "Settings…", "Quit launcher"};
         for (guint i = 0; i < G_N_ELEMENTS(commands); i++)
             preview_text(cr, commands[i], content_x + 8, 274 + i * 24, 13, FALSE, .97, .96, .98);
-        /* Persistent selection and hover have distinct custom backgrounds. */
+        /* The active marker is subtle against a neutral row; hover uses the
+         * warm Ambiance selection palette. */
         cairo_surface_flush(surface);
         guint32 active = pixels[185 * stride + content_x + 7];
         guint32 hover = pixels[209 * stride + content_x + 7];
-        g_assert_cmpuint((active >> 16) & 255, >, (hover >> 16) & 255);
+        guint32 neutral = pixels[185 * stride + content_x + 200];
+        g_assert_cmpuint((active >> 16) & 255, >, (neutral >> 16) & 255);
+        g_assert_cmpuint((hover >> 16) & 255, >, (hover >> 8) & 255);
+        g_assert_cmpuint((hover >> 8) & 255, >, hover & 255);
         char *path = g_strdup_printf("build/host/quicklist-%s.png", left ? "left" : "right");
         g_assert_cmpint(cairo_surface_write_to_png(surface, path), ==, CAIRO_STATUS_SUCCESS);
         g_free(path);

@@ -16,6 +16,7 @@ typedef struct {
     LauncherVisibility visibility;
     LauncherPosition position;
     int icon_size, monitor;
+    int window_sort; /* 0: recent focus, 1: creation, 2: title */
 } LauncherSettings;
 
 typedef void (*LauncherSettingsChanged)(const LauncherSettings *previous, gpointer data);

@@ -12,3 +12,5 @@
 
 # Generated resources, renderer previews and upstream comparison artifacts.
 /build/
+
+/tests/test-quicklist

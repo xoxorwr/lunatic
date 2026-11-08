@@ -61,6 +61,7 @@ void launcher_settings_read(LauncherSettings *s, GKeyFile *key)
     s->visibility = integer(key, "Visibility", s->visibility, VISIBILITY_ALL, VISIBILITY_PRIMARY);
     s->position = integer(key, "Position", s->position, DOCK_LEFT, DOCK_RIGHT);
     s->icon_size = integer(key, "IconSize", s->icon_size, 24, 96);
+    s->window_sort = integer(key, "WindowSort", s->window_sort, 0, 2);
     s->monitor = integer(key, "Monitor", s->monitor, 0, G_MAXINT);
     char *color = g_key_file_get_string(key, "Launcher", "CustomColor", NULL);
     GdkRGBA parsed;
@@ -85,6 +86,7 @@ void launcher_settings_write(const LauncherSettings *s, GKeyFile *key)
     g_key_file_set_integer(key, "Launcher", "Position", s->position);
     g_key_file_set_integer(key, "Launcher", "IconSize", s->icon_size);
     g_key_file_set_integer(key, "Launcher", "Monitor", s->monitor);
+    g_key_file_set_integer(key, "Launcher", "WindowSort", s->window_sort);
     char *color = gdk_rgba_to_string(&s->custom_color);
     g_key_file_set_string(key, "Launcher", "CustomColor", color);
     g_free(color);
