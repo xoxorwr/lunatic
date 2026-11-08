@@ -1,0 +1,157 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+window.background, .background {
+    color: @fg_color;
+    background-color: @bg_color;
+}
+window:backdrop { color: @backdrop_fg_color; }
+*:disabled { color: #96918a; }
+selection { color: @selected_fg_color; background-color: @selected_bg_color; }
+selection:backdrop { color: @fg_color; background-color: @backdrop_selected_bg_color; }
+
+button {
+    min-height: 0;
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid #b8b2aa;
+    border-radius: 5px;
+    color: @fg_color;
+    background: linear-gradient(to bottom, #ffffff, #efeeec 50%, #dedbd7);
+    box-shadow: inset 0 1px alpha(white, 0.6);
+    text-shadow: 0 1px alpha(white, 0.4);
+}
+button:hover { background: linear-gradient(to bottom, #ffffff, #f5f4f2 50%, #e8e4df); }
+button:active, button:checked {
+    background: linear-gradient(to bottom, #d5d0c9, #e6e2dc);
+    border-color: #9f978e;
+    box-shadow: inset 0 1px 2px alpha(black, 0.16);
+}
+button:backdrop { background-image: none; background-color: #eeece9; box-shadow: none; }
+button:disabled { background-image: none; background-color: #eeece9; box-shadow: none; text-shadow: none; }
+button:focus-visible, entry:focus-within, dropdown:focus-visible {
+    outline: 1px solid @focus_color;
+    outline-offset: -2px;
+}
+button.flat { background: transparent; border-color: transparent; box-shadow: none; }
+button.flat:hover { background-color: alpha(@fg_color, 0.10); }
+button.flat:active, button.flat:checked { background-color: alpha(@fg_color, 0.18); }
+button.suggested-action {
+    background: linear-gradient(to bottom, #f7966b, #e16b38);
+    color: white;
+    border-color: #ba542c;
+    text-shadow: 0 -1px alpha(black, 0.2);
+}
+button.suggested-action:hover { background: linear-gradient(to bottom, #ffa67a, #eb7540); }
+button.destructive-action { color: white; background: #cf4935; border-color: #ad3627; }
+button.link { color: @link_color; background: transparent; border-color: transparent; box-shadow: none; }
+button > box { border-spacing: 4px; }
+
+entry, spinbutton {
+    min-height: 0;
+    min-width: 0;
+    padding: 4px 6px;
+    color: @text_color;
+    background-color: @base_color;
+    border: 1px solid #b8b2aa;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 2px alpha(black, 0.08);
+}
+entry:disabled, spinbutton:disabled { background-color: #e9e6e1; }
+entry:backdrop { background-color: #f8f8f8; }
+entry image { color: #797269; margin: 0 2px; }
+spinbutton { padding: 0; }
+spinbutton > text { padding: 4px 6px; }
+spinbutton > button { padding: 2px 4px; border-radius: 0; border-width: 0 0 0 1px; box-shadow: none; }
+combobox button, dropdown > button { padding: 4px 6px; }
+dropdown arrow, combobox arrow { min-width: 12px; min-height: 12px; }
+
+checkbutton { min-height: 0; padding: 1px 0; border-spacing: 4px; }
+checkbutton check, checkbutton radio {
+    min-width: 14px;
+    min-height: 14px;
+    margin: 0;
+    border: 1px solid #aaa298;
+    border-radius: 3px;
+    background: linear-gradient(to bottom, #ffffff, #e8e4df);
+    color: @fg_color;
+}
+checkbutton radio { border-radius: 50%; }
+checkbutton check:checked, checkbutton check:indeterminate,
+checkbutton radio:checked { background: #f07746; border-color: #c05f34; color: white; }
+checkbutton:focus-visible { outline: 1px solid @focus_color; outline-offset: 1px; }
+switch { min-height: 18px; min-width: 36px; padding: 1px; border: 1px solid #aaa298; border-radius: 10px; background: #d8d3cc; }
+switch:checked { background: @selected_bg_color; }
+switch slider { min-height: 16px; min-width: 16px; border: 1px solid #aaa298; border-radius: 50%; background: #f8f6f3; }
+
+headerbar {
+    min-height: 0;
+    padding: 3px 6px;
+    border-bottom: 1px solid #302d28;
+    color: @dark_fg_color;
+    background: linear-gradient(to bottom, #59564e, #3e3d38);
+    box-shadow: inset 0 1px alpha(white, 0.08);
+}
+headerbar .title { font-weight: bold; }
+headerbar .subtitle { font-size: smaller; color: #bcb7ae; }
+headerbar button { padding: 3px 5px; color: @dark_fg_color; border-color: #35312b; background: linear-gradient(to bottom, #656057, #49443d); text-shadow: 0 -1px #333333; }
+headerbar button:hover { background: linear-gradient(to bottom, #777065, #595249); }
+windowcontrols { border-spacing: 3px; }
+windowcontrols button { min-width: 16px; min-height: 16px; padding: 0; border-radius: 50%; }
+windowcontrols button.close { color: #2f211c; background: linear-gradient(to bottom, #f8a174, #d76937); }
+windowcontrols button image { padding: 0; }
+
+popover.menu > contents {
+    color: @dark_fg_color;
+    background: #3c3b37;
+    padding: 3px;
+    border: 1px solid #2d2a25;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px alpha(black, 0.3);
+}
+menubar { padding: 0; background: linear-gradient(to bottom, #59564e, #3e3d38); color: @dark_fg_color; }
+menubar > item { padding: 4px 6px; }
+menubar > item:selected { background-color: #6b645a; }
+modelbutton { min-height: 0; padding: 3px 6px; border-radius: 2px; border-spacing: 6px; }
+modelbutton:hover { background: linear-gradient(to bottom, #f48b5c, #df6b39); color: white; }
+modelbutton:disabled { color: #88847c; }
+modelbutton accelerator { color: #b9b3a9; }
+popover > contents { color: @fg_color; background-color: @bg_color; border: 1px solid #b8b2aa; border-radius: 5px; padding: 6px; }
+popover.menu separator { min-height: 1px; background-color: #625c53; margin: 3px 0; }
+tooltip { color: white; background-color: #151413; border: 1px solid #000000; border-radius: 4px; padding: 4px 6px; }
+
+notebook { padding: 0; }
+notebook > header { border: 0 solid #b6afa7; }
+notebook > header.top { border-bottom-width: 1px; }
+notebook > header.bottom { border-top-width: 1px; }
+notebook > header.left { border-right-width: 1px; }
+notebook > header.right { border-left-width: 1px; }
+notebook > header tabs { margin: 0; padding: 0; min-height: 0; }
+notebook > stack { background-color: @bg_color; }
+notebook.frame { border: 1px solid #b8b2aa; }
+stacksidebar row, list row { min-height: 0; padding: 3px 6px; }
+list, listview, columnview, textview, .view { color: @text_color; background-color: @base_color; }
+row:selected, .view:selected, textview text selection { color: white; background-color: @selected_bg_color; }
+row:selected:backdrop { color: @fg_color; background-color: @backdrop_selected_bg_color; }
+row:hover:not(:selected) { background-color: #f0ece7; }
+columnview header button { padding: 3px 6px; border-radius: 0; }
+textview text { background-color: @base_color; color: @text_color; }
+scrolledwindow.frame, frame { border: 1px solid #b8b2aa; border-radius: 2px; }
+separator { min-width: 1px; min-height: 1px; background-color: #c9c3ba; }
+
+scrollbar { padding: 0; background-color: #e6e3de; border: 0; }
+scrollbar slider { min-width: 8px; min-height: 8px; margin: 1px; border: 1px solid #aaa297; border-radius: 5px; background: linear-gradient(to right, #d8d2c9, #bcb4a8); }
+scrollbar.vertical slider { min-height: 30px; }
+scrollbar.horizontal slider { min-width: 30px; }
+scrollbar slider:hover { background: #aaa092; }
+scrollbar.overlay-indicator:not(.hovering) { background: transparent; }
+scale { min-height: 0; min-width: 0; padding: 3px; }
+scale trough { min-height: 4px; min-width: 4px; border: 1px solid #b5ada2; border-radius: 3px; background: #d9d4cd; }
+scale highlight { border-color: #c76638; border-radius: 3px; background: @selected_bg_color; }
+scale slider { min-width: 12px; min-height: 12px; margin: -5px; border: 1px solid #a69c8f; border-radius: 50%; background: linear-gradient(to bottom, #ffffff, #d3ccc2); box-shadow: 0 1px 1px alpha(black, 0.15); }
+progressbar trough { min-height: 10px; min-width: 10px; border: 1px solid #b5ada2; border-radius: 3px; background: #e0dcd6; }
+progressbar progress { border-color: #c76638; min-height: 10px; border-radius: 2px; background: linear-gradient(to bottom, #f59060, #df6b39); }
+progressbar text { color: @fg_color; }
+paned > separator { min-width: 3px; min-height: 3px; background-color: @bg_color; }
+expander > title { min-height: 0; padding: 3px 0; border-spacing: 4px; }
+.linked > button, .linked > entry { border-radius: 0; }
+.linked.horizontal > :first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.linked.horizontal > :last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }

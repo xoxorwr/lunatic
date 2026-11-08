@@ -48,7 +48,8 @@ Before uninstalling the panel, follow [removal steps](PACKAGING.md#removal).
 ## GTK theme
 
 Classic Unity 7 Ambiance is included in [theme/gtk](theme/gtk/README.md), with
-GTK 2/3 styles, Xfce panel styling, and native Xfwm4 title bars and controls.
+GTK 2/3/4 styles, a Kvantum theme for Qt Widgets, Xfce panel styling, and native
+Xfwm4 title bars and controls. The ports retain compact Unity 7 proportions.
 Install with `sudo make install-theme`; select **Ambiance** for both the GTK
 and window manager themes. An optional settings helper matches Unity's button
 layout and window behavior, with backup and restore support.

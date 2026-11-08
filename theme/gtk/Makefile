@@ -3,11 +3,16 @@ DATADIR ?= $(PREFIX)/share
 THEMEDIR ?= $(DATADIR)/themes
 BINDIR ?= $(PREFIX)/bin
 
-.PHONY: all install uninstall generate-xfwm check
+.PHONY: all install uninstall generate-xfwm check check-ui
 all:
 
 check:
 	python3 tests/check-xfwm.py
+	python3 tests/check-payload.py
+
+PREVIEW_DIR ?= /tmp/lunatic-theme-preview
+check-ui:
+	python3 tests/check-widgets.py --output "$(PREVIEW_DIR)"
 
 generate-xfwm:
 	python3 generate-xfwm.py

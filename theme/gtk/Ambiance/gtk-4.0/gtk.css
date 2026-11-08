@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Ambiance for plain GTK 4. Keep the GTK 3 palette and desktop density.
+ * No global font size or fixed control height: text and scaling set the floor.
+ */
+@define-color bg_color #f2f1f0;
+@define-color fg_color #4c4c4c;
+@define-color base_color #ffffff;
+@define-color text_color #3c3c3c;
+@define-color selected_bg_color #f07746;
+@define-color selected_fg_color #ffffff;
+@define-color dark_bg_color #3c3b37;
+@define-color dark_fg_color #dfdbd2;
+@define-color backdrop_fg_color mix(@bg_color, @fg_color, 0.8);
+@define-color backdrop_text_color mix(@base_color, @text_color, 0.8);
+@define-color backdrop_selected_bg_color #dcdbd9;
+@define-color backdrop_selected_fg_color @fg_color;
+@define-color focus_color alpha(@selected_bg_color, 0.65);
+@define-color focus_bg_color alpha(@selected_bg_color, 0.10);
+@define-color active_shadow_color black;
+@import url("public-colors.css");
+@import url("gtk-widgets.css");
+/* Share the selected compact tab design with GTK 3. */
+@import url("../gtk-3.20/gtk-tabs.css");

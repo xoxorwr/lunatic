@@ -14,6 +14,9 @@ for old source installs, use the old Makefiles to uninstall first.
 The optional Ambiance theme is separate: `make install-theme PREFIX=/usr
 DESTDIR="$pkgdir"` installs `$(DATADIR)/themes/Ambiance/` and
 `$(BINDIR)/lunatic-xfce-settings`. Use `uninstall-theme` to remove them.
+The theme tree includes GTK 2/3/4 and a Kvantum theme for Qt Widgets. Qt
+activation requires the appropriate Kvantum style plugin and user selection;
+installation never changes qt5ct/qt6ct or Kvantum settings.
 The settings helper runs only when explicitly invoked by the desktop user;
 package scripts must not run it. Restore its saved settings before removing
 the theme if it was used.

@@ -300,3 +300,16 @@ License: GPL-3
  On Debian systems, the complete text of the GNU General Public License
  can be found in `/usr/share/common-licenses/GPL-3'
 
+Files: Ambiance/Kvantum/*
+Copyright: Pedram Pourang (Tsu Jan)
+License: GPL-3+
+ Adapted from KvAmbiance in Kvantum 1.1.8.
+ Source: https://github.com/tsujan/Kvantum/tree/V1.1.8/Kvantum/themes/kvthemes/KvAmbiance
+ Local modifications provide compact widget metrics and warm relief tabs.
+ The full GNU GPL version 3 text is in Ambiance/Kvantum/COPYING.
+
+Files: Ambiance/gtk-4.0/gtk.css Ambiance/gtk-4.0/gtk-widgets.css tests/*.py
+Copyright: Lunatic contributors
+License: GPL-3
+ See COPYING. Ambiance/gtk-4.0/public-colors.css is adapted from the upstream
+ named-color file and retains the CC-BY-SA-3.0 license stated above.
