@@ -50,6 +50,7 @@ windows can cover the dock. Use `--no-autohide` to keep it visible otherwise.
 | --- | --- |
 | Focus application / show active group's windows | Click icon |
 | New instance | Middle-click or Shift-click |
+| Quick window switcher | Hover an icon with multiple windows; click a window title |
 | Window list, desktop actions, pin/unpin, close all | Right-click icon |
 | Window stacking / move to workspace | Eye / workspace submenu beside each window |
 | Pin / reorder | Drop a desktop file / drag an icon |
@@ -90,6 +91,7 @@ make check-renderer         # headless CPU renderer; images in build/cpu/
 make check-renderer-parity  # optional GL comparison; needs libepoxy and EGL
 make check-upstream        # snapshot hashes and original/C state/reveal comparison
 LUNATIC_TEST_NESTED_DISPLAY=:98 make check-barriers  # disposable nested X server only
+LUNATIC_TEST_NESTED_DISPLAY=:98 make check-hover     # hover popup and window switching
 make bake-assets           # regenerate bundled PNGs; needs rsvg-convert
 ```
 

@@ -890,9 +890,41 @@ static void barrier_reveal_rules(void)
     dock.settings = previous;
 }
 
+static void window_list_hover_lifetime(void)
+{
+    Client client = {.xid = 42, .title = "First window"};
+    Item owner = {.name = "Application", .clients = g_ptr_array_new()};
+    Item other = {0};
+    g_ptr_array_add(owner.clients, &client);
+    DockView view = {.window_list_item = &owner,
+                     .window_list_rect = {100, 50, 320, 180}};
+    g_assert_true(window_list_keep_open(&view, &owner, 90, 100, 1000));
+    g_assert_true(window_list_keep_open(&view, NULL, 95, 100, 1010));
+    g_assert_cmpint(view.window_list_leave_deadline, ==, 1210);
+    g_assert_true(window_list_keep_open(&view, NULL, 120, 100, 1100));
+    g_assert_cmpint(view.window_list_leave_deadline, ==, 0);
+    /* Neither surface is hovered: dismiss after grace rather than trapping
+     * the launcher open or closing before the pointer can cross the gap. */
+    g_assert_true(window_list_keep_open(&view, NULL, 500, 300, 1200));
+    g_assert_true(window_list_keep_open(&view, NULL, 500, 300, 1399));
+    g_assert_false(window_list_keep_open(&view, NULL, 500, 300, 1400));
+    g_assert_false(window_list_keep_open(&view, &other, 90, 150, 1401));
+    guint64 before = window_list_signature(&owner);
+    client.title = "Renamed window";
+    g_assert_cmpuint(before, !=, window_list_signature(&owner));
+    before = window_list_signature(&owner);
+    client.active = TRUE;
+    g_assert_cmpuint(before, !=, window_list_signature(&owner));
+    before = window_list_signature(&owner);
+    client.xid = 43;
+    g_assert_cmpuint(before, !=, window_list_signature(&owner));
+    g_ptr_array_unref(owner.clients);
+}
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
+    g_test_add_func("/host/window-list-hover-lifetime", window_list_hover_lifetime);
     g_test_add_func("/host/barrier-reveal-rules", barrier_reveal_rules);
     g_test_add_func("/host/desktop-order-and-layout", desktop_order);
     g_test_add_func("/host/invalid-drag-sources", invalid_drag_sources);

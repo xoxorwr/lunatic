@@ -81,6 +81,11 @@ static gboolean super_tap_update(SuperTap *tap, gboolean super_left, gboolean pr
 typedef struct {
     GtkWidget *window, *items_box, *menu;
     GtkWidget *tooltip_window, *tooltip_label;
+    GtkWidget *window_list;
+    Item *window_list_item;
+    GdkRectangle window_list_rect;
+    gint64 window_list_leave_deadline;
+    guint64 window_list_signature;
     guint tooltip_timer;
     double menu_icon_y;
     Item *menu_item;
@@ -189,6 +194,9 @@ static gboolean animation_frame(gpointer data);
 static void schedule_refresh(void);
 static void wake_animation(void);
 static void hide_icon_tooltip(DockView *view);
+static void hide_window_list(DockView *view);
+static void show_window_list(DockView *view, Item *item);
+static void refresh_window_lists(void);
 static gboolean handle_key(XKeyEvent *event);
 static void handle_raw_shortcut(XEvent *event);
 static void configure_barrier(DockView *view);
@@ -465,6 +473,8 @@ static void item_free(gpointer data)
     if (dock.views)
         for (guint i = 0; i < dock.views->len; i++) {
             DockView *view = g_ptr_array_index(dock.views, i);
+            if (view->window_list_item == item)
+                hide_window_list(view);
             if (view->menu_item == item)
                 view->menu_item = NULL;
             if (view->hovered == item) {
@@ -1405,6 +1415,7 @@ static double quicklist_anchor_y(Item *item, GdkEvent *event, int canvas_root_y,
 
 static void show_menu(Item *item, GdkEvent *event)
 {
+    hide_window_list(dock.view);
     hide_icon_tooltip(dock.view);
     if (dock.view->menu)
         gtk_menu_popdown(GTK_MENU(dock.view->menu));
@@ -1585,6 +1596,7 @@ static void refresh(void)
         }
     }
     dock.refreshing = FALSE;
+    refresh_window_lists();
 }
 
 static gboolean refresh_idle(gpointer data)
@@ -1978,6 +1990,7 @@ static gboolean dash_pinned(GDesktopAppInfo *app, gpointer data)
 
 static void show_search(void)
 {
+    hide_window_list(dock.view);
     hide_icon_tooltip(dock.view);
     if (!dock.dash) {
         dock.dash = launcher_dash_new(dash_launch, dash_pin, dash_pinned, NULL);
@@ -2314,10 +2327,213 @@ static void hide_icon_tooltip(DockView *view)
         gtk_widget_hide(view->tooltip_window);
 }
 
+static guint64 window_list_signature(const Item *item)
+{
+    guint64 signature = item->clients->len;
+    for (guint i = 0; i < item->clients->len; i++) {
+        const Client *client = g_ptr_array_index(item->clients, i);
+        signature = signature * 33 + client->xid;
+        signature = signature * 33 + g_str_hash(client->title ? client->title : item->name);
+        signature = signature * 33 + client->active;
+    }
+    return signature;
+}
+
+static void hide_window_list(DockView *view)
+{
+    GtkWidget *popup = view->window_list;
+    view->window_list = NULL;
+    view->window_list_item = NULL;
+    view->window_list_rect = (GdkRectangle){0};
+    view->window_list_leave_deadline = 0;
+    if (popup) {
+        gtk_widget_destroy(popup);
+        g_object_unref(popup);
+        hide_machine_quirk(&view->hide, QUICKLIST_OPEN, dock.menu_open,
+                           g_get_monotonic_time() / 1000);
+    }
+}
+
+static void window_list_activate(GtkButton *button, gpointer data)
+{
+    DockView *view = data;
+    Window xid = (Window)(guintptr)g_object_get_data(G_OBJECT(button), "window-xid");
+    dock.view = view;
+    hide_window_list(view);
+    activate(xid);
+}
+
+static gboolean hover_popup_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
+{
+    DockView *view = data;
+    gboolean tooltip = widget == view->tooltip_window;
+    Item *item = tooltip ? view->hovered : view->window_list_item;
+    GdkRectangle rect = tooltip ? view->tooltip_rect : view->window_list_rect;
+    if (item)
+        quicklist_paint_frame(
+            cr, gtk_widget_get_allocated_width(widget), gtk_widget_get_allocated_height(widget),
+            dock.settings.position != DOCK_RIGHT, view->top + item->layout.center - rect.y);
+    return FALSE;
+}
+
+static void style_hover_popup(GtkWidget *popup, DockView *view)
+{
+    GdkVisual *visual = gdk_screen_get_rgba_visual(gtk_widget_get_screen(popup));
+    if (visual)
+        gtk_widget_set_visual(popup, visual);
+    GtkCssProvider *css = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(
+        css,
+        "#lunatic-window-list, #lunatic-icon-tooltip { background: transparent; "
+        "border: 0; box-shadow: none; color: #f4f1f5; }"
+        "#lunatic-window-list label, #lunatic-icon-tooltip label "
+        "{ color: inherit; text-shadow: none; }"
+        "#lunatic-window-list .window-list-title { font-weight: bold; padding: 0 8px; }"
+        "#lunatic-window-list button { background: transparent; background-image: none; "
+        "border: 0; border-radius: 4px; box-shadow: none; padding: 8px; color: #f4f1f5; }"
+        "#lunatic-window-list button:hover { background: rgba(150,75,205,0.45); }"
+        "#lunatic-window-list .active-window { font-weight: bold; }",
+        -1, NULL);
+    gtk_style_context_add_provider_for_screen(gtk_widget_get_screen(popup), GTK_STYLE_PROVIDER(css),
+                                              GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_set_data_full(G_OBJECT(popup), "quicklist-css", css, g_object_unref);
+    g_signal_connect(popup, "destroy", G_CALLBACK(quicklist_remove_style), NULL);
+    g_signal_connect(popup, "draw", G_CALLBACK(hover_popup_draw), view);
+}
+
+static void position_window_list(DockView *view)
+{
+    if (!view->window_list || !view->window_list_item)
+        return;
+    GtkRequisition size;
+    gtk_widget_get_preferred_size(view->window_list, NULL, &size);
+    GdkRectangle rect = icon_tooltip_rect(view, view->window_list_item, size.width, size.height);
+    if (!gdk_rectangle_equal(&rect, &view->window_list_rect)) {
+        view->window_list_rect = rect;
+        gtk_window_move(GTK_WINDOW(view->window_list), rect.x, rect.y);
+        gtk_widget_queue_draw(view->window_list);
+    }
+}
+
+static GtkWidget *window_list_content(DockView *view, const Item *item)
+{
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    gtk_widget_set_margin_start(box, dock.settings.position == DOCK_RIGHT ? 12 : 24);
+    gtk_widget_set_margin_end(box, dock.settings.position == DOCK_RIGHT ? 24 : 12);
+    gtk_widget_set_margin_top(box, 12);
+    gtk_widget_set_margin_bottom(box, 12);
+    GtkWidget *title = gtk_label_new(item->name);
+    gtk_label_set_xalign(GTK_LABEL(title), 0);
+    gtk_label_set_max_width_chars(GTK_LABEL(title), 32);
+    gtk_label_set_ellipsize(GTK_LABEL(title), PANGO_ELLIPSIZE_END);
+    gtk_style_context_add_class(gtk_widget_get_style_context(title), "window-list-title");
+    gtk_box_pack_start(GTK_BOX(box), title, FALSE, FALSE, 4);
+    GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll), TRUE);
+    gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(scroll),
+                                               MAX(32, MIN(360, view->height - 80)));
+    GtkWidget *rows = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    for (guint i = 0; i < item->clients->len; i++) {
+        const Client *client = g_ptr_array_index(item->clients, i);
+        GtkWidget *button = gtk_button_new();
+        GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+        GtkWidget *indicator = gtk_image_new_from_icon_name(
+            client->active ? "object-select-symbolic" : "view-grid-symbolic", GTK_ICON_SIZE_MENU);
+        gtk_box_pack_start(GTK_BOX(row), indicator, FALSE, FALSE, 0);
+        GtkWidget *label = gtk_label_new(client->title ? client->title : item->name);
+        gtk_label_set_xalign(GTK_LABEL(label), 0);
+        gtk_label_set_max_width_chars(GTK_LABEL(label), 32);
+        gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+        gtk_box_pack_start(GTK_BOX(row), label, TRUE, TRUE, 0);
+        gtk_container_add(GTK_CONTAINER(button), row);
+        if (client->active)
+            gtk_style_context_add_class(gtk_widget_get_style_context(button), "active-window");
+        atk_object_set_name(gtk_widget_get_accessible(button),
+                            client->title ? client->title : item->name);
+        g_object_set_data(G_OBJECT(button), "window-xid", (gpointer)(guintptr)client->xid);
+        g_signal_connect(button, "clicked", G_CALLBACK(window_list_activate), view);
+        gtk_box_pack_start(GTK_BOX(rows), button, FALSE, FALSE, 0);
+    }
+    gtk_container_add(GTK_CONTAINER(scroll), rows);
+    gtk_box_pack_start(GTK_BOX(box), scroll, TRUE, TRUE, 0);
+    return box;
+}
+
+static void show_window_list(DockView *view, Item *item)
+{
+    hide_icon_tooltip(view);
+    hide_window_list(view);
+    view->window_list_item = item;
+    view->window_list_signature = window_list_signature(item);
+    view->window_list = gtk_window_new(GTK_WINDOW_POPUP);
+    g_object_ref_sink(view->window_list);
+    gtk_widget_set_name(view->window_list, "lunatic-window-list");
+    gtk_window_set_accept_focus(GTK_WINDOW(view->window_list), FALSE);
+    gtk_window_set_resizable(GTK_WINDOW(view->window_list), FALSE);
+    gtk_window_set_transient_for(GTK_WINDOW(view->window_list), GTK_WINDOW(view->window));
+    gtk_window_set_type_hint(GTK_WINDOW(view->window_list), GDK_WINDOW_TYPE_HINT_POPUP_MENU);
+    gtk_widget_set_size_request(view->window_list, MAX(100, MIN(320, view->geometry.width - 16)),
+                                -1);
+    style_hover_popup(view->window_list, view);
+    gtk_container_add(GTK_CONTAINER(view->window_list), window_list_content(view, item));
+    gtk_widget_show_all(gtk_bin_get_child(GTK_BIN(view->window_list)));
+    position_window_list(view);
+    gtk_widget_show(view->window_list);
+    hide_machine_quirk(&view->hide, QUICKLIST_OPEN, TRUE, g_get_monotonic_time() / 1000);
+    wake_animation();
+}
+
+/* Allow crossing the gap into the list without grabbing the pointer or focus.
+ * Another icon takes over immediately; leaving both surfaces gets a short grace. */
+static gboolean window_list_keep_open(DockView *view, Item *target, int x, int y, gint64 now)
+{
+    GdkRectangle rect = view->window_list_rect;
+    gboolean inside =
+        x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
+    if (target && target != view->window_list_item)
+        return FALSE;
+    if (inside || target == view->window_list_item) {
+        view->window_list_leave_deadline = 0;
+        return TRUE;
+    }
+    if (!view->window_list_leave_deadline)
+        view->window_list_leave_deadline = now + 200;
+    return now < view->window_list_leave_deadline;
+}
+
+static void refresh_window_lists(void)
+{
+    if (!dock.views)
+        return;
+    for (guint i = 0; i < dock.views->len; i++) {
+        DockView *view = g_ptr_array_index(dock.views, i);
+        Item *item = view->window_list_item;
+        if (!item)
+            continue;
+        if (item->clients->len <= 1)
+            hide_window_list(view);
+        else if (view->window_list_signature != window_list_signature(item)) {
+            gint64 deadline = view->window_list_leave_deadline;
+            GtkWidget *old = gtk_bin_get_child(GTK_BIN(view->window_list));
+            gtk_widget_destroy(old);
+            gtk_container_add(GTK_CONTAINER(view->window_list), window_list_content(view, item));
+            gtk_widget_show_all(view->window_list);
+            view->window_list_signature = window_list_signature(item);
+            view->window_list_leave_deadline = deadline;
+            position_window_list(view);
+        }
+    }
+}
+
 static void position_icon_tooltip(DockView *view)
 {
     if (!view->tooltip_window || !view->hovered)
         return;
+    gtk_widget_set_margin_start(view->tooltip_label,
+                                dock.settings.position == DOCK_RIGHT ? 16 : 28);
+    gtk_widget_set_margin_end(view->tooltip_label, dock.settings.position == DOCK_RIGHT ? 28 : 16);
     GtkRequisition size;
     gtk_widget_get_preferred_size(view->tooltip_window, NULL, &size);
     GdkRectangle rect = icon_tooltip_rect(view, view->hovered, size.width, size.height);
@@ -2335,6 +2551,10 @@ static gboolean show_icon_tooltip(gpointer data)
     if (view->disposing || !view->hovered || view->hidden || view->menu ||
         (view->hide.quirks & INTERNAL_DND_ACTIVE) || !view->tooltip_window)
         return G_SOURCE_REMOVE;
+    if (!view->hovered->kind && view->hovered->clients->len > 1) {
+        show_window_list(view, view->hovered);
+        return G_SOURCE_REMOVE;
+    }
     gtk_label_set_text(GTK_LABEL(view->tooltip_label), view->hovered->name);
     position_icon_tooltip(view);
     gtk_widget_show(view->tooltip_window);
@@ -2344,6 +2564,8 @@ static gboolean show_icon_tooltip(gpointer data)
 static gboolean set_hovered_item(Item *item, gint64 now)
 {
     DockView *view = dock.view;
+    if (item && view->window_list_item && item != view->window_list_item)
+        hide_window_list(view);
     if (item == view->hovered)
         return FALSE;
     gboolean visible = view->tooltip_window && gtk_widget_get_visible(view->tooltip_window);
@@ -2353,7 +2575,7 @@ static gboolean set_hovered_item(Item *item, gint64 now)
         Item *candidate = g_ptr_array_index(dock.items, i);
         animation_to(&item_view_state(candidate)->unfold, candidate == item ? 1 : 0, 200, now);
     }
-    if (item && view->tooltip_window) {
+    if (item && view->tooltip_window && !view->window_list) {
         if (visible)
             show_icon_tooltip(view);
         else
@@ -2370,6 +2592,29 @@ static void tooltip_realized(GtkWidget *widget, gpointer data)
     cairo_region_t *empty = cairo_region_create();
     gdk_window_input_shape_combine_region(gtk_widget_get_window(widget), empty, 0, 0);
     cairo_region_destroy(empty);
+}
+
+static void create_icon_tooltip(DockView *view)
+{
+    view->tooltip_window = gtk_window_new(GTK_WINDOW_POPUP);
+    g_object_ref_sink(view->tooltip_window);
+    gtk_window_set_type_hint(GTK_WINDOW(view->tooltip_window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
+    gtk_window_set_accept_focus(GTK_WINDOW(view->tooltip_window), FALSE);
+    gtk_window_set_resizable(GTK_WINDOW(view->tooltip_window), FALSE);
+    gtk_window_set_transient_for(GTK_WINDOW(view->tooltip_window), GTK_WINDOW(view->window));
+    gtk_widget_set_name(view->tooltip_window, "lunatic-icon-tooltip");
+    gtk_widget_set_size_request(view->tooltip_window, -1, 48);
+    style_hover_popup(view->tooltip_window, view);
+    view->tooltip_label = gtk_label_new(NULL);
+    gtk_label_set_ellipsize(GTK_LABEL(view->tooltip_label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(view->tooltip_label), 40);
+    gtk_widget_set_margin_start(view->tooltip_label, 10);
+    gtk_widget_set_margin_end(view->tooltip_label, 10);
+    gtk_widget_set_margin_top(view->tooltip_label, 12);
+    gtk_widget_set_margin_bottom(view->tooltip_label, 12);
+    gtk_container_add(GTK_CONTAINER(view->tooltip_window), view->tooltip_label);
+    gtk_widget_show(view->tooltip_label);
+    g_signal_connect(view->tooltip_window, "realize", G_CALLBACK(tooltip_realized), view);
 }
 
 static RenderArg item_render_arg(Item *item, guint i, gint64 now)
@@ -2513,6 +2758,7 @@ static gboolean canvas_press(GtkWidget *widget, GdkEventButton *event, gpointer 
     (void)data;
     Item *item = hit_item(event->y);
     hide_icon_tooltip(dock.view);
+    hide_window_list(dock.view);
     dock.view->press_x = event->x;
     dock.view->press_y = event->y;
     dock.view->pressed = item;
@@ -2633,6 +2879,7 @@ static void drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer data
     (void)data;
     dock.view->pressed = NULL;
     hide_icon_tooltip(dock.view);
+    hide_window_list(dock.view);
     hide_machine_quirk(&dock.view->hide, INTERNAL_DND_ACTIVE, TRUE, g_get_monotonic_time() / 1000);
     if (dock.view->dragged && dock.view->dragged->icon)
         gtk_drag_set_icon_pixbuf(context, dock.view->dragged->icon, 0, 0);
@@ -2898,7 +3145,8 @@ static gboolean animation_step(gint64 now, gboolean shared_redraw)
     hide_machine_mode(&dock.view->hide, dock.settings.autohide ? AUTOHIDE : HIDE_NEVER, now);
     hide_machine_quirk(&dock.view->hide, MOUSE_OVER_LAUNCHER, mouse_over && !dock.view->hidden,
                        now);
-    hide_machine_quirk(&dock.view->hide, QUICKLIST_OPEN, dock.menu_open, now);
+    hide_machine_quirk(&dock.view->hide, QUICKLIST_OPEN,
+                       dock.menu_open || dock.view->window_list != NULL, now);
     hide_machine_quirk(&dock.view->hide, PLACES_VISIBLE,
                        (dock.search && gtk_widget_get_visible(dock.search)) ||
                            (dock.settings_window && gtk_widget_get_visible(dock.settings_window)),
@@ -2919,7 +3167,8 @@ static gboolean animation_step(gint64 now, gboolean shared_redraw)
     }
     gboolean hover =
         launcher_should_hover(dock.view->hidden, mouse_over, FALSE, dock.view->keyboard_mode,
-                              dock.menu_open, dock.view->dragged != NULL);
+                              dock.menu_open || dock.view->window_list != NULL,
+                              dock.view->dragged != NULL);
     animation_to(&dock.view->hover_animation, hover ? 1 : 0, 200, now);
     if (animation_tick(&dock.view->hide_animation, now)) {
         int input_width =
@@ -2953,14 +3202,23 @@ static gboolean animation_step(gint64 now, gboolean shared_redraw)
     if (dock.view->menu && dock.view->menu_item &&
         previous_anchor != dock.view->menu_item->layout.center)
         gtk_widget_queue_draw(dock.view->menu);
-    redraw |= set_hovered_item(pointer_item(x, y), now);
+    Item *target = pointer_item(x, y);
+    if (dock.view->window_list) {
+        position_window_list(dock.view);
+        if (window_list_keep_open(dock.view, target, x, y, now))
+            target = dock.view->window_list_item;
+        else
+            hide_window_list(dock.view);
+    }
+    redraw |= set_hovered_item(target, now);
     if (dock.view->tooltip_window && gtk_widget_get_visible(dock.view->tooltip_window))
         position_icon_tooltip(dock.view);
     if (redraw)
         queue_render(dock.view->items_box);
     dock.mouse_x = x;
     dock.mouse_y = y;
-    gboolean active = dock.view->hide_animation.value != dock.view->hide_animation.target ||
+    gboolean active = dock.view->window_list != NULL ||
+                      dock.view->hide_animation.value != dock.view->hide_animation.target ||
                       dock.view->hover_animation.value != dock.view->hover_animation.target;
     for (guint i = 0; i < dock.items->len; i++) {
         Item *item = g_ptr_array_index(dock.items, i);
@@ -3115,24 +3373,7 @@ static DockView *create_view(int monitor)
     dock.view->items_box = gtk_drawing_area_new();
     gtk_widget_set_size_request(dock.view->items_box, dock.view->width, 1);
     gtk_widget_set_can_focus(dock.view->items_box, TRUE);
-    view->tooltip_window = gtk_window_new(GTK_WINDOW_POPUP);
-    g_object_ref_sink(view->tooltip_window);
-    gtk_window_set_type_hint(GTK_WINDOW(view->tooltip_window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
-    gtk_window_set_accept_focus(GTK_WINDOW(view->tooltip_window), FALSE);
-    gtk_window_set_resizable(GTK_WINDOW(view->tooltip_window), FALSE);
-    gtk_window_set_transient_for(GTK_WINDOW(view->tooltip_window), GTK_WINDOW(view->window));
-    gtk_style_context_add_class(gtk_widget_get_style_context(view->tooltip_window),
-                                GTK_STYLE_CLASS_TOOLTIP);
-    view->tooltip_label = gtk_label_new(NULL);
-    gtk_label_set_ellipsize(GTK_LABEL(view->tooltip_label), PANGO_ELLIPSIZE_END);
-    gtk_label_set_max_width_chars(GTK_LABEL(view->tooltip_label), 40);
-    gtk_widget_set_margin_start(view->tooltip_label, 10);
-    gtk_widget_set_margin_end(view->tooltip_label, 10);
-    gtk_widget_set_margin_top(view->tooltip_label, 6);
-    gtk_widget_set_margin_bottom(view->tooltip_label, 6);
-    gtk_container_add(GTK_CONTAINER(view->tooltip_window), view->tooltip_label);
-    gtk_widget_show(view->tooltip_label);
-    g_signal_connect(view->tooltip_window, "realize", G_CALLBACK(tooltip_realized), view);
+    create_icon_tooltip(view);
     gtk_container_add(GTK_CONTAINER(dock.view->window), dock.view->items_box);
     gtk_widget_add_events(dock.view->items_box, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
                                                     GDK_POINTER_MOTION_MASK |
@@ -3179,6 +3420,7 @@ static void destroy_view(gpointer data)
     view->disposing = TRUE;
     destroy_barrier(view);
     hide_icon_tooltip(view);
+    hide_window_list(view);
     if (view->tooltip_window) {
         gtk_widget_destroy(view->tooltip_window);
         g_object_unref(view->tooltip_window);

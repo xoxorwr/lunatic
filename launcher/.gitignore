@@ -2,6 +2,7 @@
 /lunatic-launcher
 /tests/test-core
 /tests/test-barrier
+/tests/test-hover
 /tests/test-model
 /tests/test-tracking
 /tests/test-dash
