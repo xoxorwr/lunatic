@@ -3,6 +3,11 @@
 Classic Unity 7 GTK 2/3 theme with Xfce panel styling and Xfwm4 decorations.
 GTK 2 requires Murrine (`gtk2-engines-murrine` on Debian/Ubuntu).
 
+GTK 3 tabs use warm-grey inactive tabs and raised ivory selected tabs, with a
+bold selected label. The selection stays distinct in unfocused windows. This
+applies to standard notebooks, including Thunar and Terminator; application
+specific tab styles retain their overrides.
+
 ## Install
 
 From the repository root:

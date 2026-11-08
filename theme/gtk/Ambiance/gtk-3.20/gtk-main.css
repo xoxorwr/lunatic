@@ -60,6 +60,7 @@
 @import url("gtk-widgets-borders.css");
 @import url("gtk-widgets-assets.css");
 @import url("gtk-widgets.css");
+@import url("gtk-tabs.css");
 @import url("apps/unity.css");
 @import url("apps/gedit.css");
 @import url("apps/nautilus.css");

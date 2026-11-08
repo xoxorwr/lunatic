@@ -1,0 +1,133 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Warm relief tabs: retain Ambiance's ivory selection and warm grey chrome,
+ * with enough contrast to identify the current page even without focus.
+ * Compact tab labels and close buttons without fixing the text height.
+ * Loaded before application overrides so their specialized tabs still apply.
+ */
+notebook > header {
+    background-color: #d8d5d0;
+    border-color: #b6afa7;
+}
+
+notebook > header.top tab,
+notebook > header.bottom tab,
+notebook > header.left tab,
+notebook > header.right tab {
+    background-image: linear-gradient(to bottom, #dedbd6, #d3cfc9);
+    color: #655f59;
+    border: solid #beb8b0;
+    border-width: 1px 1px 0;
+    border-image: none;
+    border-radius: 4px 4px 0 0;
+    box-shadow: none;
+    background-clip: border-box;
+    margin: 0;
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 6px;
+}
+
+notebook > header.top tab:hover:not(:checked),
+notebook > header.bottom tab:hover:not(:checked),
+notebook > header.left tab:hover:not(:checked),
+notebook > header.right tab:hover:not(:checked) {
+    background-image: linear-gradient(to bottom, #e7e3de, #dcd7d0);
+}
+
+notebook > header.top tab:checked,
+notebook > header.bottom tab:checked,
+notebook > header.left tab:checked,
+notebook > header.right tab:checked,
+notebook > header.top tab:checked:hover,
+notebook > header.bottom tab:checked:hover,
+notebook > header.left tab:checked:hover,
+notebook > header.right tab:checked:hover {
+    background-image: linear-gradient(to bottom, #fffdfa, #f2f1f0);
+    color: #3c3b37;
+    border-color: #aaa198;
+    border-width: 1px 1px 0;
+    border-radius: 4px 4px 0 0;
+    border-image: none;
+    box-shadow: inset 0 1px #ffffff;
+    padding: 2px 6px;
+}
+
+notebook > header.top tab:checked:backdrop,
+notebook > header.bottom tab:checked:backdrop,
+notebook > header.left tab:checked:backdrop,
+notebook > header.right tab:checked:backdrop,
+notebook > header.top tab:checked:hover:backdrop,
+notebook > header.bottom tab:checked:hover:backdrop,
+notebook > header.left tab:checked:hover:backdrop,
+notebook > header.right tab:checked:hover:backdrop {
+    background-image: linear-gradient(to bottom, #f8f6f3, #eeece8);
+    color: #5d5751;
+}
+
+notebook > header tab:checked label {
+    font-weight: bold;
+}
+
+/* Join the selected tab to the page on every supported tab-bar edge. */
+notebook > header.bottom tab,
+notebook > header.bottom tab:checked,
+notebook > header.bottom tab:checked:hover {
+    border-radius: 0 0 4px 4px;
+    border-width: 0 1px 1px;
+}
+
+notebook > header.left tab,
+notebook > header.left tab:checked,
+notebook > header.left tab:checked:hover {
+    border-radius: 4px 0 0 4px;
+    border-width: 1px 0 1px 1px;
+}
+
+notebook > header.right tab,
+notebook > header.right tab:checked,
+notebook > header.right tab:checked:hover {
+    border-radius: 0 4px 4px 0;
+    border-width: 1px 1px 1px 0;
+}
+
+/* Reserve room for the rounded cap inside the header's allocation. Avoid
+ * negative tab margins and the old border artwork painting beyond the tab. */
+notebook > header.top { padding: 1px 0 0; }
+notebook > header.bottom { padding: 0 0 1px; }
+notebook > header.left { padding: 0 0 0 1px; }
+notebook > header.right { padding: 0 1px 0 0; }
+
+/* The old label border adds two pixels to every row. Keep keyboard focus as
+ * an inset outline instead, so focus and selection cannot change row height. */
+notebook > header tab label {
+    border: 0;
+}
+
+notebook:focus > header tab:checked label {
+    outline: 1px solid @focus_color;
+    outline-offset: -1px;
+}
+
+/* A tab close button is an icon control, not a full-size dialog button. */
+notebook > header tab button,
+notebook > header tab button:hover,
+notebook > header tab button:active,
+notebook > header tab button:backdrop {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 1px solid transparent;
+    border-image: none;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: none;
+}
+
+notebook > header tab button:hover {
+    background-color: alpha(@fg_color, 0.10);
+}
+
+notebook > header tab button:active {
+    background-color: alpha(@fg_color, 0.18);
+}
